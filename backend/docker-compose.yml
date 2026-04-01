@@ -1,0 +1,20 @@
+# Optional: Postgres with the same user/password/db as the default DATABASE_URL in .env.example
+# Usage (from backend/):
+#   docker compose up -d
+# If port 5432 is already taken by another Postgres, change the left side: "5433:5432"
+# and set DATABASE_URL=...@localhost:5433/...
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: holistica
+      POSTGRES_PASSWORD: holistica
+      POSTGRES_DB: holistica_health
+    ports:
+      - "5432:5432"
+    volumes:
+      - holistica_pgdata:/var/lib/postgresql/data
+
+volumes:
+  holistica_pgdata:

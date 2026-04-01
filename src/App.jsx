@@ -1,5 +1,12 @@
 import { useMemo, useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, Leaf } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Leaf, Loader2 } from "lucide-react";
+import {
+  clearStoredUserId,
+  getStoredUserId,
+  setStoredUserId,
+  upsertProfile,
+} from "./api";
+import { HealthChat } from "./components/HealthChat";
 import {
   PolarAngleAxis,
   PolarGrid,
@@ -88,6 +95,11 @@ const initialScores = { VATA: 0, PITTA: 0, KAPHA: 0 };
 function App() {
   const [step, setStep] = useState(0);
   const [answers, setAnswers] = useState({});
+  const [backendUserId, setBackendUserId] = useState(() => getStoredUserId());
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState(null);
+  const [profileSavedAt, setProfileSavedAt] = useState(null);
+  const [chatMountKey, setChatMountKey] = useState(0);
   const isComplete = step >= QUESTIONS.length;
 
   const scores = useMemo(() => {
@@ -123,6 +135,40 @@ function App() {
   const restart = () => {
     setAnswers({});
     setStep(0);
+    clearStoredUserId();
+    setBackendUserId(null);
+    setProfileError(null);
+    setProfileSavedAt(null);
+    setChatMountKey((k) => k + 1);
+  };
+
+  const saveProfileToBackend = async () => {
+    setProfileSaving(true);
+    setProfileError(null);
+    try {
+      const existingId = backendUserId || undefined;
+      const letter = Object.entries(CHOICE_TO_DOSHA).find(([, d]) => d === primaryDosha)?.[0];
+      const payload = {
+        ...(existingId ? { user_id: existingId } : {}),
+        consent_flags: { prakriti_quiz_completed: true, app: "holistica_web" },
+        prakriti_quiz: {
+          scores: { VATA: scores.VATA, PITTA: scores.PITTA, KAPHA: scores.KAPHA },
+          primary_dosha: primaryDosha,
+          primary_choice_letter: letter,
+          answers,
+        },
+      };
+      const res = await upsertProfile(payload);
+      const id = res.user_id;
+      setStoredUserId(id);
+      setBackendUserId(id);
+      setProfileSavedAt(new Date().toISOString());
+      setChatMountKey((k) => k + 1);
+    } catch (e) {
+      setProfileError(e instanceof Error ? e.message : "Could not save profile");
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   return (
@@ -208,6 +254,7 @@ function App() {
             </div>
           </>
         ) : (
+          <>
           <section className="grid gap-6 lg:grid-cols-2">
             <article className="rounded-2xl border border-slate-200/70 bg-white p-5 md:p-6">
               <p className="text-sm text-slate-500">Dosha Distribution</p>
@@ -265,15 +312,42 @@ function App() {
                 <ScorePill label="Kapha" score={scores.KAPHA} color="bg-kapha/25 text-green-800" />
               </div>
 
-              <button
-                type="button"
-                onClick={restart}
-                className="mt-6 rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
-              >
-                Retake Quiz
-              </button>
+              <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:flex-wrap">
+                <button
+                  type="button"
+                  onClick={saveProfileToBackend}
+                  disabled={profileSaving}
+                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-emerald-800 px-4 py-2 text-sm font-medium text-white transition hover:bg-emerald-900 disabled:opacity-60"
+                >
+                  {profileSaving ? <Loader2 className="animate-spin" size={16} /> : null}
+                  {backendUserId ? "Update profile on server" : "Save profile & enable chat"}
+                </button>
+                <button
+                  type="button"
+                  onClick={restart}
+                  className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-700 transition hover:bg-slate-50"
+                >
+                  Retake Quiz
+                </button>
+              </div>
+              {profileError && (
+                <p className="mt-3 text-sm text-red-600" role="alert">
+                  {profileError}
+                </p>
+              )}
+              {profileSavedAt && !profileError && (
+                <p className="mt-3 text-xs text-emerald-700">
+                  Profile synced. Chat is available below{backendUserId ? ` (user id stored locally).` : "."}
+                </p>
+              )}
             </article>
           </section>
+
+          <section className="mt-8" aria-label="HolisticAI chat">
+            <h2 className="mb-3 text-lg font-semibold text-slate-900">Ask HolisticAI</h2>
+            <HealthChat key={chatMountKey} userId={backendUserId} />
+          </section>
+          </>
         )}
       </div>
     </main>

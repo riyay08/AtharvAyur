@@ -1,0 +1,17 @@
+# HolisticAI Health — backend (Python 3.12+; 3.13 works if 3.12 is not installed)
+# Web
+fastapi>=0.115.0
+uvicorn[standard]>=0.30.0
+
+# Config & validation
+pydantic>=2.0.0
+pydantic-settings>=2.0.0
+python-dotenv>=1.0.0
+
+# Database
+sqlalchemy>=2.0.0
+alembic>=1.13.0
+psycopg2-binary>=2.9.0
+
+# GenAI (Steps 3–4)
+google-genai>=1.0.0
