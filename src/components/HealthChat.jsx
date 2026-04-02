@@ -30,7 +30,7 @@ export function HealthChat({ userId }) {
           ...m,
           {
             role: "assistant",
-            text: data.reply || "This message could not be processed.",
+            text: data.response_text || data.reply || "This message could not be processed.",
             blocked: true,
             safetyReason: data.safety_reason,
             matchedTerms: data.matched_terms,
@@ -41,7 +41,7 @@ export function HealthChat({ userId }) {
           ...m,
           {
             role: "assistant",
-            text: data.reply || "",
+            text: data.response_text || data.reply || "",
             citations: data.citations || [],
             webSearchQueries: data.web_search_queries || [],
             modelSafety: data.blocked_by_model_safety,
@@ -117,12 +117,12 @@ export function HealthChat({ userId }) {
                   {msg.citations.map((c, j) => (
                     <li key={j}>
                       <a
-                        href={c.uri}
+                        href={c.url || c.uri}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="text-cyan-700 underline hover:text-cyan-900"
                       >
-                        {c.title || c.uri}
+                        {c.source_name || c.title || c.url || c.uri}
                       </a>
                     </li>
                   ))}

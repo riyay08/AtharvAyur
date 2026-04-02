@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import desc, select
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.dependencies import get_db
@@ -16,19 +16,6 @@ from app.services.llm_orchestrator import OrchestratorConfigError, generate_heal
 from app.services.safety_engine import evaluate_message
 
 router = APIRouter(tags=["chat"])
-
-_HISTORY_LIMIT = 5
-
-
-def _recent_history(db: Session, user_id: uuid.UUID, limit: int = _HISTORY_LIMIT) -> list[ChatHistory]:
-    stmt = (
-        select(ChatHistory)
-        .where(ChatHistory.user_id == user_id)
-        .order_by(desc(ChatHistory.timestamp))
-        .limit(limit)
-    )
-    rows = list(db.execute(stmt).scalars().all())
-    return list(reversed(rows))
 
 
 @router.post("/chat", response_model=ChatResponse)
@@ -47,8 +34,6 @@ def chat_turn(
         select(HealthProfile).where(HealthProfile.user_id == user.id)
     ).scalar_one_or_none()
 
-    history = _recent_history(db, user.id)
-
     safety = evaluate_message(body.message, health_profile=profile)
     if not safety.allowed:
         db.add(
@@ -60,7 +45,7 @@ def chat_turn(
         db.commit()
         return ChatResponse(
             blocked=True,
-            reply=safety.escalation_message,
+            response_text=safety.escalation_message,
             safety_reason=safety.reason.value,
             matched_terms=list(safety.matched_terms),
         )
@@ -68,8 +53,9 @@ def chat_turn(
     try:
         result = generate_health_reply(
             body.message,
+            db=db,
+            user_id=user.id,
             health_profile=profile,
-            chat_history=history,
         )
     except OrchestratorConfigError as exc:
         raise HTTPException(
@@ -81,11 +67,12 @@ def chat_turn(
         user_id=user.id,
         role=ChatRole.USER,
         message=body.message,
+        embedding=list(result.prompt_embedding) if result.prompt_embedding else None,
     )
     assistant_row = ChatHistory(
         user_id=user.id,
         role=ChatRole.ASSISTANT,
-        message=result.text,
+        message=result.response_text,
     )
     db.add(user_row)
     db.add(assistant_row)
@@ -99,9 +86,9 @@ def chat_turn(
 
     return ChatResponse(
         blocked=False,
-        reply=result.text,
+        response_text=result.response_text,
         citations=[
-            CitationOut(title=c.title, uri=c.uri) for c in result.citations
+            CitationOut(source_name=c.source_name, url=c.url) for c in result.citations
         ],
         web_search_queries=list(result.web_search_queries),
         blocked_by_model_safety=result.blocked_by_model_safety,

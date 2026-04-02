@@ -11,13 +11,13 @@ class ChatRequest(BaseModel):
 
 
 class CitationOut(BaseModel):
-    title: str | None = None
-    uri: str
+    source_name: str
+    url: str
 
 
 class ChatResponse(BaseModel):
     blocked: bool = False
-    reply: str | None = None
+    response_text: str | None = None
     safety_reason: str | None = None
     matched_terms: list[str] = Field(default_factory=list)
     citations: list[CitationOut] = Field(default_factory=list)

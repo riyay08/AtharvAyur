@@ -8,6 +8,9 @@ class Settings(BaseSettings):
     gemini_api_key: str | None = None
     # Model must support Grounding with Google Search — see https://ai.google.dev/gemini-api/docs/google-search
     gemini_model: str = "gemini-2.5-flash"
+    gemini_embedding_model: str = "gemini-embedding-001"
+    immediate_history_limit: int = 3
+    semantic_history_limit: int = 5
 
     # Comma-separated origins for the Vite dev server / production frontend
     cors_origins: str = "http://localhost:5173,http://127.0.0.1:5173"

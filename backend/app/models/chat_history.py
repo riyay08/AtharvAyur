@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING
 from sqlalchemy import DateTime, Enum as SAEnum, ForeignKey, Text, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from pgvector.sqlalchemy import Vector
 
 from app.database import Base
 
@@ -39,6 +40,7 @@ class ChatHistory(Base):
         nullable=False,
     )
     message: Mapped[str] = mapped_column(Text, nullable=False)
+    embedding: Mapped[list[float] | None] = mapped_column(Vector(768), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),
