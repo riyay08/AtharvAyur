@@ -12,7 +12,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from app.config import settings  # noqa: E402
 from app.database import Base  # noqa: E402
-from app.models import AuditLog, ChatHistory, HealthProfile, User  # noqa: E402, F401
+from app.models import (  # noqa: E402, F401
+    AuditLog,
+    ChatHistory,
+    DailyCheckIn,
+    HealthProfile,
+    User,
+    WeeklyPlan,
+)
 
 config = context.config
 

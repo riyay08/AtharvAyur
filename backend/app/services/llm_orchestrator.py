@@ -355,3 +355,25 @@ def generate_health_reply(
         blocked_by_model_safety=safety_stopped,
         prompt_embedding=tuple(query_embedding) if query_embedding else None,
     )
+
+
+# --- Weekly plan (Dynamic Category Stack) — consumed by `app.services.weekly_plan_service` ---
+
+WEEKLY_PLAN_DYNAMIC_STACK_SYSTEM = (
+    "You are a safe health planner. Using the user's Dosha (from profile) and recent chat themes "
+    "(including pgvector-retrieved symptoms), design a 7-day lifestyle and Ayurvedic-inspired plan. "
+    "Do not prescribe medicine. Emphasize hydration, movement, sleep, and Dosha-supporting foods. "
+    "Every task MUST be placed in exactly one of three pillars: Mind, Fuel, or Body — no other "
+    "categories. "
+    "Every task MUST include a context_reason string that explicitly links the task to EITHER the "
+    "user's Dosha OR a specific recent symptom/theme from their chat history (e.g. "
+    "\"To soothe yesterday's bloating\" or \"Balances Pitta per your profile\"). Never use vague "
+    "context_reason text. "
+    "Output a single raw JSON object (no markdown fences) with exactly this structure: "
+    '{"daily_focus_message": string, "days": array of 7 objects each with "date" (YYYY-MM-DD) and '
+    '"pillars": {"Mind": array, "Fuel": array, "Body": array}}. '
+    "Each task object MUST be: "
+    '{"id": number, "task": string, "context_reason": string, "completed": false}. '
+    "Use unique numeric ids across all tasks in the entire plan. "
+    "Include at least one task per pillar per day; you may include several per pillar."
+)

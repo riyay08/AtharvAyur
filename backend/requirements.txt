@@ -16,3 +16,6 @@ pgvector>=0.3.6
 
 # GenAI (Steps 3–4)
 google-genai>=1.0.0
+
+# Scheduled jobs
+apscheduler>=3.10.0

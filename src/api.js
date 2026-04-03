@@ -26,6 +26,16 @@ export function clearStoredUserId() {
   }
 }
 
+/** Clears saved user id + onboarding flag (e.g. to show the quiz again). */
+export function clearHolisticaSession() {
+  clearStoredUserId();
+  try {
+    localStorage.removeItem("holistica_has_completed_onboarding");
+  } catch {
+    /* ignore */
+  }
+}
+
 function apiBase() {
   const raw = import.meta.env.VITE_API_URL;
   if (raw != null && String(raw).trim() !== "") {
@@ -76,6 +86,76 @@ export async function sendChatMessage(userId, message) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user_id: userId, message }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatError(res.status, data));
+  return data;
+}
+
+/**
+ * @param {string} userId
+ * @param {{
+ *   check_in_date?: string,
+ *   sleep_quality: 'heavy'|'restless'|'refreshed',
+ *   digestion: 'bloated'|'acidic'|'calm',
+ *   energy_state: 'wired'|'grounded'|'sluggish',
+ *   movement: 'rest'|'light'|'sweat',
+ *   water_glasses: number
+ * }} payload
+ */
+export async function postCheckIn(userId, payload) {
+  const res = await fetch(apiUrl("/checkin"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId, ...payload }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatError(res.status, data));
+  return data;
+}
+
+/**
+ * @param {string} userId
+ * @param {string} [endDateYmd] - Client local YYYY-MM-DD for window end (today); aligns 7-day strip with UI.
+ */
+export async function getCheckInWeek(userId, endDateYmd) {
+  const q = new URLSearchParams({ user_id: userId });
+  if (endDateYmd) q.set("end_date", endDateYmd);
+  const res = await fetch(`${apiUrl("/checkin/week")}?${q}`);
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatError(res.status, data));
+  return data;
+}
+
+/** @param {string} userId */
+export async function getCurrentPlan(userId) {
+  const q = new URLSearchParams({ user_id: userId });
+  const res = await fetch(`${apiUrl("/plan/current")}?${q}`);
+  const data = await res.json().catch(() => null);
+  if (!res.ok) throw new Error(formatError(res.status, data || {}));
+  return data;
+}
+
+/**
+ * @param {{ user_id: string, plan_id?: string | null, day_index: number, pillar: 'Mind'|'Fuel'|'Body', task_id: number, completed?: boolean | null }} body
+ */
+export async function putPlanTask(body) {
+  const res = await fetch(apiUrl("/plan/task"), {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatError(res.status, data));
+  return data;
+}
+
+/** @param {string} userId */
+export async function generateWeeklyPlan(userId) {
+  const res = await fetch(apiUrl("/plan/generate"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ user_id: userId }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(formatError(res.status, data));

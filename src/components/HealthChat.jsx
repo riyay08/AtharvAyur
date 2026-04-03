@@ -67,10 +67,10 @@ export function HealthChat({ userId }) {
 
   if (!userId) {
     return (
-      <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50/80 p-8 text-center text-slate-600">
-        <MessageCircle className="mx-auto mb-3 text-slate-400" size={36} />
-        <p className="text-sm font-medium text-slate-700">HolisticAI chat</p>
-        <p className="mt-1 text-sm">
+      <div className="rounded-2xl border border-dashed border-emerald-500/25 bg-emerald-500/5 p-8 text-center text-slate-400">
+        <MessageCircle className="mx-auto mb-3 text-emerald-400/50" size={36} />
+        <p className="text-sm font-medium text-slate-200">HolisticAI chat</p>
+        <p className="mt-1 text-sm text-slate-500">
           Save your quiz results with the button above to create your profile and unlock the assistant.
         </p>
       </div>
@@ -78,9 +78,9 @@ export function HealthChat({ userId }) {
   }
 
   return (
-    <div className="flex flex-col rounded-2xl border border-slate-200/70 bg-white shadow-sm">
-      <div className="border-b border-slate-100 px-4 py-3">
-        <h3 className="text-sm font-semibold text-slate-900">HolisticAI Health</h3>
+    <div className="flex flex-col overflow-hidden rounded-2xl border border-white/[0.08] bg-black/20 shadow-[0_20px_50px_rgba(0,0,0,0.35)] backdrop-blur-md">
+      <div className="border-b border-white/10 px-4 py-3">
+        <h3 className="text-sm font-semibold text-slate-100">HolisticAI Health</h3>
         <p className="text-xs text-slate-500">Non-diagnostic wellness assistant (grounded search when relevant)</p>
       </div>
 
@@ -91,36 +91,33 @@ export function HealthChat({ userId }) {
           </p>
         )}
         {messages.map((msg, i) => (
-          <div
-            key={i}
-            className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
-          >
+          <div key={i} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div
               className={`max-w-[90%] rounded-2xl px-4 py-2 text-sm leading-relaxed ${
                 msg.role === "user"
-                  ? "bg-slate-900 text-white"
+                  ? "border border-emerald-500/35 bg-emerald-500/15 text-emerald-50 shadow-[0_0_24px_rgba(52,211,153,0.12)]"
                   : msg.blocked
-                    ? "border border-amber-200 bg-amber-50 text-amber-950"
-                    : "border border-slate-200 bg-slate-50 text-slate-800"
+                    ? "border border-amber-400/35 bg-amber-500/10 text-amber-100"
+                    : "border border-white/10 bg-white/[0.06] text-slate-200"
               }`}
             >
               <p className="whitespace-pre-wrap">{msg.text}</p>
               {msg.safetyReason && (
-                <p className="mt-2 text-xs opacity-90">Reason: {msg.safetyReason}</p>
+                <p className="mt-2 text-xs text-amber-200/80">Reason: {msg.safetyReason}</p>
               )}
               {msg.matchedTerms?.length > 0 && (
-                <p className="mt-1 text-xs opacity-90">Matched: {msg.matchedTerms.join(", ")}</p>
+                <p className="mt-1 text-xs text-amber-200/70">Matched: {msg.matchedTerms.join(", ")}</p>
               )}
               {msg.citations?.length > 0 && (
-                <ul className="mt-3 space-y-1 border-t border-slate-200/80 pt-2 text-xs">
-                  <li className="font-medium text-slate-600">Sources</li>
+                <ul className="mt-3 space-y-1 border-t border-white/10 pt-2 text-xs">
+                  <li className="font-medium text-emerald-400/90">Sources</li>
                   {msg.citations.map((c, j) => (
                     <li key={j}>
                       <a
                         href={c.url || c.uri}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="text-cyan-700 underline hover:text-cyan-900"
+                        className="text-emerald-300/90 underline decoration-emerald-500/40 underline-offset-2 transition hover:text-emerald-200"
                       >
                         {c.source_name || c.title || c.url || c.uri}
                       </a>
@@ -134,15 +131,17 @@ export function HealthChat({ userId }) {
                 </p>
               )}
               {msg.modelSafety && (
-                <p className="mt-2 text-xs text-amber-800">Note: reply may have been limited by model safety filters.</p>
+                <p className="mt-2 text-xs text-amber-300/80">
+                  Note: reply may have been limited by model safety filters.
+                </p>
               )}
             </div>
           </div>
         ))}
         {loading && (
           <div className="flex justify-start">
-            <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-2 text-sm text-slate-600">
-              <Loader2 className="animate-spin" size={16} />
+            <div className="flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] px-4 py-2 text-sm text-slate-400">
+              <Loader2 className="animate-spin text-emerald-400/80" size={16} />
               Thinking…
             </div>
           </div>
@@ -151,24 +150,24 @@ export function HealthChat({ userId }) {
       </div>
 
       {error && (
-        <div className="border-t border-red-100 bg-red-50 px-4 py-2 text-sm text-red-800">{error}</div>
+        <div className="border-t border-rose-500/25 bg-rose-950/40 px-4 py-2 text-sm text-rose-200">{error}</div>
       )}
 
-      <div className="flex gap-2 border-t border-slate-100 p-3">
+      <div className="flex gap-2 border-t border-white/10 bg-black/20 p-3">
         <textarea
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={onKeyDown}
           rows={2}
           placeholder="Type a message…"
-          className="min-h-[44px] flex-1 resize-none rounded-xl border border-slate-200 px-3 py-2 text-sm outline-none ring-slate-400 focus:ring-2"
+          className="min-h-[44px] flex-1 resize-none rounded-xl border border-white/15 bg-white/5 px-3 py-2 text-sm text-slate-100 placeholder:text-slate-600 outline-none transition focus:border-emerald-500/40 focus:ring-2 focus:ring-emerald-500/20"
           disabled={loading}
         />
         <button
           type="button"
           onClick={handleSend}
           disabled={loading || !input.trim()}
-          className="inline-flex shrink-0 items-center justify-center gap-2 self-end rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white transition hover:bg-slate-800 disabled:opacity-50"
+          className="inline-flex shrink-0 items-center justify-center gap-2 self-end rounded-xl bg-gradient-to-r from-emerald-600 to-emerald-500 px-4 py-2 text-sm font-medium text-emerald-950 shadow-lg shadow-emerald-900/30 transition hover:from-emerald-500 hover:to-emerald-400 disabled:opacity-50"
         >
           <Send size={16} />
           Send
