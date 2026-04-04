@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-import uuid
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
@@ -12,14 +12,17 @@ from app.models.chat_history import ChatHistory, ChatRole
 from app.models.health_profile import HealthProfile
 from app.models.user import User
 from app.schemas.chat import ChatRequest, ChatResponse, CitationOut
+from app.services.environment_service import EnvironmentServiceError, get_environment_context
 from app.services.llm_orchestrator import OrchestratorConfigError, generate_health_reply
 from app.services.safety_engine import evaluate_message
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["chat"])
 
 
 @router.post("/chat", response_model=ChatResponse)
-def chat_turn(
+async def chat_turn(
     body: ChatRequest,
     db: Session = Depends(get_db),
 ) -> ChatResponse:
@@ -50,17 +53,31 @@ def chat_turn(
             matched_terms=list(safety.matched_terms),
         )
 
+    env_ctx = None
+    if body.latitude is not None and body.longitude is not None:
+        try:
+            env_ctx = await get_environment_context(body.latitude, body.longitude)
+        except EnvironmentServiceError as exc:
+            logger.info("Chat without environment context: %s", exc)
+
     try:
         result = generate_health_reply(
             body.message,
             db=db,
             user_id=user.id,
             health_profile=profile,
+            environment_context=env_ctx,
         )
     except OrchestratorConfigError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail=str(exc),
+        ) from exc
+    except Exception as exc:
+        logger.exception("chat.generate_health_reply failed")
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Assistant temporarily unavailable. Please try again shortly.",
         ) from exc
 
     user_row = ChatHistory(

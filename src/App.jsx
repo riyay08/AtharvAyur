@@ -1,8 +1,9 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
 import { clearHolisticaSession, getStoredUserId, setStoredUserId, upsertProfile } from "./api";
 import { DailyCheckIn } from "./components/DailyCheckIn";
+import { DailyEnvironmentTip } from "./components/DailyEnvironmentTip";
 import { HealthChat } from "./components/HealthChat";
 import { QuizResults } from "./components/QuizResults";
 import { WeeklyPlanPanel } from "./components/WeeklyPlanPanel";
@@ -104,6 +105,23 @@ function App() {
   const [assessment, setAssessment] = useState(null);
   const [continueLoading, setContinueLoading] = useState(false);
   const [continueError, setContinueError] = useState(null);
+  const [geo, setGeo] = useState(null);
+  const [geoStatus, setGeoStatus] = useState("pending");
+
+  useEffect(() => {
+    if (typeof navigator === "undefined" || !navigator.geolocation) {
+      setGeoStatus("unsupported");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setGeo({ lat: pos.coords.latitude, lon: pos.coords.longitude });
+        setGeoStatus("ok");
+      },
+      () => setGeoStatus("denied"),
+      { enableHighAccuracy: false, timeout: 15_000, maximumAge: 300_000 }
+    );
+  }, []);
 
   const answeredCount = useMemo(() => Object.keys(answers).length, [answers]);
   const progress = Math.round((answeredCount / QUIZ_QUESTIONS.length) * 100);
@@ -186,7 +204,15 @@ function App() {
 
           <div className="grid gap-6 lg:grid-cols-12 lg:items-start">
             <div className="space-y-6 lg:col-span-5">
-              <DailyCheckIn userId={backendUserId} />
+              <div className="grid gap-6 lg:grid-cols-2 lg:items-stretch">
+                <DailyCheckIn userId={backendUserId} />
+                <DailyEnvironmentTip
+                  userId={backendUserId}
+                  latitude={geo?.lat}
+                  longitude={geo?.lon}
+                  geoStatus={geoStatus}
+                />
+              </div>
               <WeeklyPlanPanel userId={backendUserId} />
             </div>
             <div className="lg:col-span-7">
@@ -197,7 +223,11 @@ function App() {
                   Non-diagnostic guidance with search-backed citations when available.
                 </p>
                 <div className="mt-5">
-                  <HealthChat userId={backendUserId} />
+                  <HealthChat
+                    userId={backendUserId}
+                    latitude={geo?.lat}
+                    longitude={geo?.lon}
+                  />
                 </div>
               </div>
             </div>

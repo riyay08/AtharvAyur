@@ -80,12 +80,22 @@ export async function upsertProfile(payload) {
 /**
  * @param {string} userId - UUID
  * @param {string} message
+ * @param {{ latitude?: number, longitude?: number }} [coords]
  */
-export async function sendChatMessage(userId, message) {
+export async function sendChatMessage(userId, message, coords) {
+  const body = { user_id: userId, message };
+  if (
+    coords &&
+    typeof coords.latitude === "number" &&
+    typeof coords.longitude === "number"
+  ) {
+    body.latitude = coords.latitude;
+    body.longitude = coords.longitude;
+  }
   const res = await fetch(apiUrl("/chat"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId, message }),
+    body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(formatError(res.status, data));
@@ -108,6 +118,27 @@ export async function postCheckIn(userId, payload) {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ user_id: userId, ...payload }),
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(formatError(res.status, data));
+  return data;
+}
+
+/**
+ * Cached daily environment tip (per user, per UTC day on server).
+ * @param {string} userId
+ * @param {number} latitude
+ * @param {number} longitude
+ */
+export async function postEnvironmentDailyTip(userId, latitude, longitude) {
+  const res = await fetch(apiUrl("/environment/daily-tip"), {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      user_id: userId,
+      latitude,
+      longitude,
+    }),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(formatError(res.status, data));

@@ -3,9 +3,9 @@ import { Loader2, MessageCircle, Send } from "lucide-react";
 import { sendChatMessage } from "../api";
 
 /**
- * @param {{ userId: string | null }} props
+ * @param {{ userId: string | null, latitude?: number, longitude?: number }} props
  */
-export function HealthChat({ userId }) {
+export function HealthChat({ userId, latitude, longitude }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
@@ -24,7 +24,11 @@ export function HealthChat({ userId }) {
     setMessages((m) => [...m, { role: "user", text }]);
     setLoading(true);
     try {
-      const data = await sendChatMessage(userId, text);
+      const coords =
+        typeof latitude === "number" && typeof longitude === "number"
+          ? { latitude, longitude }
+          : undefined;
+      const data = await sendChatMessage(userId, text, coords);
       if (data.blocked) {
         setMessages((m) => [
           ...m,

@@ -8,18 +8,26 @@ the hardcoded safety screening.
 from __future__ import annotations
 
 import json
+import logging
 import uuid
 from dataclasses import dataclass
 from typing import Any
 
 from google import genai
 from google.genai import types
+from google.genai.errors import APIError
 from sqlalchemy import desc, select
+from sqlalchemy.exc import SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.config import settings
 from app.models.chat_history import ChatHistory, ChatRole
 from app.models.health_profile import HealthProfile
+
+logger = logging.getLogger(__name__)
+
+# Must match `ChatHistory.embedding` column (pgvector).
+_EMBEDDING_DIM = 768
 
 
 class OrchestratorConfigError(RuntimeError):
@@ -89,8 +97,33 @@ def _health_profile_context_block(profile: HealthProfile | None) -> str:
         )
 
 
-def _build_system_instruction(profile: HealthProfile | None) -> str:
+def _build_system_instruction(
+    profile: HealthProfile | None,
+    *,
+    environment_context: dict[str, str] | None = None,
+) -> str:
     profile_blob = _health_profile_context_block(profile)
+    if environment_context:
+        env_blob = json.dumps(environment_context, indent=2, ensure_ascii=False)
+        env_block = (
+            f"Current environment (approximate from weather and location):\n{env_blob}\n\n"
+            "ENVIRONMENT & DESHA: You must tailor your advice to the user's environment. "
+            "If they are in a cold or dry place, suggest warming and nourishing practices "
+            "(e.g., gentle steam, warm fluids, abhyanga-style self-massage with awareness of allergies, "
+            "nasal care education such as traditional nasya only as general wellness context—not as a prescription). "
+            "If humidity is high or the air feels damp, favor light, warm, well-digestible foods and movement that "
+            "does not overheat. If they are in a dense urban setting, suggest practices to ground the nervous system "
+            "and reconnect with nature (short outdoor breaks, breath awareness, routine). "
+            "Always stay non-diagnostic and avoid specific dosing or medical instructions.\n\n"
+        )
+    else:
+        env_block = (
+            "ENVIRONMENT & DESHA: When the user describes their environment (climate, city, season), tailor your "
+            "Ayurvedic lifestyle suggestions accordingly: cold/dry favors warming and unctuous qualities in "
+            "moderation; damp favors lightness and warmth; urban stress favors grounding and nature contact. "
+            "No environment data was provided for this turn—infer only if the user mentions it.\n\n"
+        )
+
     return f"""You are HolisticAI, a highly intelligent, non-diagnostic health and wellness guide. You integrate modern lifestyle education with Ayurvedic principles based on the user's provided profile.
 
 CORE DIRECTIVES:
@@ -99,7 +132,7 @@ CORE DIRECTIVES:
 3. CITATION INTEGRITY (No fake links): You will use the Google Search tool to find evidence. You MUST NOT invent, guess, or hallucinate URLs. If the search tool does not provide a reputable link for a claim, you must state: "I do not have verified information on this specific topic."
 4. UNIFIED SAFETY: Treat all paradigms equally. Do not prescribe Ayurvedic herbs as if they are harmless. If a user asks about taking a supplement/herb, you MUST check their HealthProfile for medications and explicitly state if there are potential interactions, or advise them to check with their doctor.
 
-You must return JSON with this exact schema:
+{env_block}You must return JSON with this exact schema:
 {{
   "response_text": "The conversational reply to the user",
   "citations": [{{"source_name": "Name", "url": "Actual URL from Search tool"}}]
@@ -232,11 +265,27 @@ def _embed_text(client: genai.Client, text: str) -> list[float]:
     emb = client.models.embed_content(
         model=settings.gemini_embedding_model,
         contents=[text],
-        config=types.EmbedContentConfig(output_dimensionality=768),
+        config=types.EmbedContentConfig(output_dimensionality=_EMBEDDING_DIM),
     )
     if not emb.embeddings or not emb.embeddings[0].values:
         return []
     return list(emb.embeddings[0].values)
+
+
+def _embed_text_safe(client: genai.Client, text: str) -> list[float]:
+    try:
+        vec = _embed_text(client, text)
+    except APIError as exc:
+        logger.warning("Gemini embedding failed (semantic memory disabled for this turn): %s", exc)
+        return []
+    if len(vec) != _EMBEDDING_DIM:
+        logger.warning(
+            "Embedding length %s != %s (schema mismatch); skipping semantic retrieval.",
+            len(vec),
+            _EMBEDDING_DIM,
+        )
+        return []
+    return vec
 
 
 def _fetch_immediate_context(db: Session, user_id: uuid.UUID) -> list[ChatHistory]:
@@ -276,6 +325,7 @@ def generate_health_reply(
     db: Session,
     user_id: uuid.UUID,
     health_profile: HealthProfile | None,
+    environment_context: dict[str, str] | None = None,
     api_key: str | None = None,
     model: str | None = None,
 ) -> OrchestratorResult:
@@ -288,9 +338,13 @@ def generate_health_reply(
     model_id = model or settings.gemini_model
     client = genai.Client(api_key=key)
 
-    query_embedding = _embed_text(client, user_message)
+    query_embedding = _embed_text_safe(client, user_message)
     immediate_rows = _fetch_immediate_context(db, user_id)
-    relevant_rows = _fetch_semantic_context(db, user_id, query_embedding)
+    try:
+        relevant_rows = _fetch_semantic_context(db, user_id, query_embedding)
+    except SQLAlchemyError as exc:
+        logger.warning("Semantic history query failed (pgvector / DB): %s", exc)
+        relevant_rows = []
 
     immediate_context = _format_history_block(
         immediate_rows,
@@ -308,26 +362,58 @@ def generate_health_reply(
         f"Relevant Past History (semantic retrieval, only if useful):\n{relevant_context}"
     )
 
+    system_instruction = _build_system_instruction(
+        health_profile,
+        environment_context=environment_context,
+    )
+    user_content = types.Content(
+        role="user",
+        parts=[types.Part.from_text(text=payload_text)],
+    )
+
     grounding_tool = types.Tool(google_search=types.GoogleSearch())
-    config = types.GenerateContentConfig(
-        system_instruction=_build_system_instruction(health_profile),
+    config_with_search = types.GenerateContentConfig(
+        system_instruction=system_instruction,
         tools=[grounding_tool],
     )
 
-    response = client.models.generate_content(
-        model=model_id,
-        contents=[
-            types.Content(
-                role="user",
-                parts=[types.Part.from_text(text=payload_text)],
+    try:
+        response = client.models.generate_content(
+            model=model_id,
+            contents=[user_content],
+            config=config_with_search,
+        )
+    except APIError as exc:
+        logger.warning(
+            "Gemini generate with Google Search failed; retrying without search tool: %s",
+            exc,
+        )
+        fallback_instruction = (
+            system_instruction
+            + "\n\nNOTE: Live web search is unavailable for this turn. "
+            "Return citations as an empty array unless you are citing from retrieved tool output; "
+            "never invent URLs."
+        )
+        config_no_tools = types.GenerateContentConfig(system_instruction=fallback_instruction)
+        try:
+            response = client.models.generate_content(
+                model=model_id,
+                contents=[user_content],
+                config=config_no_tools,
             )
-        ],
-        config=config,
-    )
+        except APIError as exc2:
+            raise OrchestratorConfigError(
+                "The assistant could not reach the AI service (quota, network, model access, or "
+                "configuration). Please try again in a few minutes."
+            ) from exc2
 
     safety_stopped = _model_safety_blocked(response)
     finish = _response_finish_reason(response)
-    raw_text = (response.text or "").strip()
+    try:
+        raw_text = (response.text or "").strip()
+    except Exception:
+        logger.warning("Could not read response.text from model response.")
+        raw_text = ""
     if safety_stopped and not raw_text:
         raw_text = (
             '{"response_text":"The model could not produce a reply for this request due to safety '
