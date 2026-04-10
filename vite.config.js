@@ -9,7 +9,7 @@ export default defineConfig({
     proxy: {
       // Use relative URLs in dev: fetch('/api/health') → FastAPI on 8000
       "/api": {
-        target: "http://127.0.0.1:8000",
+        target: process.env.API_PROXY_TARGET || "http://127.0.0.1:8000",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ""),
       },
