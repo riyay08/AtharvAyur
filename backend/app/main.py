@@ -1,7 +1,9 @@
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
+from sqlalchemy.exc import OperationalError, ProgrammingError
 
 from app.config import settings
 from app.routers import auth, chat, checkin, environment, plan, profile
@@ -21,6 +23,33 @@ app = FastAPI(
     version="0.1.0",
     lifespan=lifespan,
 )
+
+
+@app.exception_handler(OperationalError)
+async def database_unreachable(_request: Request, _exc: OperationalError) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": (
+                "Database is unreachable. Start PostgreSQL (from backend/: docker compose up -d) "
+                "and ensure DATABASE_URL in .env matches."
+            )
+        },
+    )
+
+
+@app.exception_handler(ProgrammingError)
+async def database_schema_error(_request: Request, _exc: ProgrammingError) -> JSONResponse:
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": (
+                "Database tables are missing or out of date. From backend/ with your venv active, run: "
+                "alembic upgrade head"
+            )
+        },
+    )
+
 
 _cors = [o.strip() for o in settings.cors_origins.split(",") if o.strip()]
 app.add_middleware(
