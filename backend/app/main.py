@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.config import settings
-from app.routers import chat, checkin, environment, plan, profile
+from app.routers import auth, chat, checkin, environment, plan, profile
 from app.services.scheduler import shutdown_scheduler, start_scheduler
 
 
@@ -31,6 +31,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router)
 app.include_router(profile.router)
 app.include_router(chat.router)
 app.include_router(checkin.router)

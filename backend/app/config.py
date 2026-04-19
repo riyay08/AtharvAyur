@@ -12,6 +12,9 @@ class Settings(BaseSettings):
     immediate_history_limit: int = 3
     semantic_history_limit: int = 5
 
+    jwt_secret_key: str = "change-me-in-env"
+    jwt_algorithm: str = "HS256"
+
     # OpenWeatherMap Current Weather API (free tier): https://openweathermap.org/api
     openweather_api_key: str | None = None
 

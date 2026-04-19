@@ -1,13 +1,12 @@
 from __future__ import annotations
 
-import uuid
 from datetime import date, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db
+from app.dependencies import get_current_user, get_db
 from app.models.audit_log import AuditLog
 from app.models.daily_check_in import (
     DailyCheckIn,
@@ -29,23 +28,21 @@ router = APIRouter(tags=["checkin"])
 
 @router.get("/checkin/week", response_model=DailyCheckInWeekResponse)
 def get_checkin_week(
-    user_id: uuid.UUID = Query(..., description="User UUID"),
     end_date: date | None = Query(
         default=None,
-        description="Last day of the 7-day window (inclusive); defaults to server today. "
-        "Pass the client's local today for alignment with the UI strip.",
+        description=(
+            "Last day of the 7-day window (inclusive); defaults to server today. "
+            "Pass the client's local today for alignment with the UI strip."
+        ),
     ),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> DailyCheckInWeekResponse:
-    user = db.get(User, user_id)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
-
     anchor = end_date or date.today()
     start = anchor - timedelta(days=6)
     rows = db.execute(
         select(DailyCheckIn).where(
-            DailyCheckIn.user_id == user_id,
+            DailyCheckIn.user_id == current_user.id,
             DailyCheckIn.check_in_date >= start,
             DailyCheckIn.check_in_date <= anchor,
         )
@@ -69,18 +66,12 @@ def get_checkin_week(
 def create_or_update_checkin(
     body: DailyCheckInCreate,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> DailyCheckInOut:
-    """
-    Upsert: creates or updates the row for (user_id, check_in_date) so past days can be edited.
-    """
-    user = db.get(User, body.user_id)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
-
     check_date = body.check_in_date or date.today()
     existing = db.execute(
         select(DailyCheckIn).where(
-            DailyCheckIn.user_id == body.user_id,
+            DailyCheckIn.user_id == current_user.id,
             DailyCheckIn.check_in_date == check_date,
         )
     ).scalar_one_or_none()
@@ -95,7 +86,7 @@ def create_or_update_checkin(
 
     if existing is None:
         row = DailyCheckIn(
-            user_id=body.user_id,
+            user_id=current_user.id,
             check_in_date=check_date,
             **payload,
         )
@@ -112,7 +103,7 @@ def create_or_update_checkin(
 
     db.add(
         AuditLog(
-            actor=str(body.user_id),
+            actor=str(current_user.id),
             action=f"checkin.upsert date={check_date}",
         )
     )

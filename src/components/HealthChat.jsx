@@ -1,6 +1,28 @@
 import { useCallback, useRef, useState } from "react";
-import { Loader2, MessageCircle, Send } from "lucide-react";
+import { Loader2, MessageCircle, Send, ShieldCheck } from "lucide-react";
 import { sendChatMessage } from "../api";
+
+/** @param {string} url */
+function citationTrustMeta(url) {
+  try {
+    const h = new URL(url).hostname.toLowerCase();
+    if (h.endsWith(".gov") || h.endsWith(".edu")) {
+      return {
+        badgeClass: "border-amber-400/50 bg-amber-500/15 text-amber-200",
+        title: "High trust: government or academic domain",
+      };
+    }
+    return {
+      badgeClass: "border-sky-400/40 bg-sky-500/12 text-sky-200",
+      title: "Verified medical / institutional source",
+    };
+  } catch {
+    return {
+      badgeClass: "border-sky-400/40 bg-sky-500/12 text-sky-200",
+      title: "Verified medical / institutional source",
+    };
+  }
+}
 
 /**
  * @param {{ userId: string | null, latitude?: number, longitude?: number }} props
@@ -28,7 +50,7 @@ export function HealthChat({ userId, latitude, longitude }) {
         typeof latitude === "number" && typeof longitude === "number"
           ? { latitude, longitude }
           : undefined;
-      const data = await sendChatMessage(userId, text, coords);
+      const data = await sendChatMessage(text, coords);
       if (data.blocked) {
         setMessages((m) => [
           ...m,
@@ -115,18 +137,30 @@ export function HealthChat({ userId, latitude, longitude }) {
               {msg.citations?.length > 0 && (
                 <ul className="mt-3 space-y-1 border-t border-white/10 pt-2 text-xs">
                   <li className="font-medium text-emerald-400/90">Sources</li>
-                  {msg.citations.map((c, j) => (
-                    <li key={j}>
-                      <a
-                        href={c.url || c.uri}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-emerald-300/90 underline decoration-emerald-500/40 underline-offset-2 transition hover:text-emerald-200"
-                      >
-                        {c.source_name || c.title || c.url || c.uri}
-                      </a>
-                    </li>
-                  ))}
+                  {msg.citations.map((c, j) => {
+                    const href = c.url || c.uri;
+                    const label = c.source_name || c.title || href;
+                    const trust = citationTrustMeta(href);
+                    return (
+                      <li key={j} className="flex items-start gap-2">
+                        <span
+                          className={`mt-0.5 inline-flex shrink-0 rounded-md border p-0.5 ${trust.badgeClass}`}
+                          title={trust.title}
+                          aria-hidden
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5" strokeWidth={2} />
+                        </span>
+                        <a
+                          href={href}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="min-w-0 flex-1 text-emerald-300/90 underline decoration-emerald-500/40 underline-offset-2 transition hover:text-emerald-200"
+                        >
+                          {label}
+                        </a>
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
               {msg.webSearchQueries?.length > 0 && (

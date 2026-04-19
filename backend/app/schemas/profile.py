@@ -5,17 +5,11 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from app.schemas.checkin import DailyCheckInOut
+from app.schemas.plan import WeeklyPlanOut
+
 
 class ProfileUpsertRequest(BaseModel):
-    """
-    Create or update a user and their health profile.
-    Omit ``user_id`` to create a new user (UUID returned in the response).
-    """
-
-    user_id: uuid.UUID | None = Field(
-        default=None,
-        description="Existing user UUID. If omitted, a new user is created.",
-    )
     region: str | None = Field(default=None, max_length=255)
     consent_flags: dict[str, Any] | list[Any] | None = None
     conditions: dict[str, Any] | list[Any] | None = None
@@ -30,4 +24,22 @@ class ProfileUpsertRequest(BaseModel):
 class ProfileUpsertResponse(BaseModel):
     user_id: uuid.UUID
     health_profile_id: uuid.UUID
-    created_user: bool = False
+
+
+class HealthProfileOut(BaseModel):
+    id: uuid.UUID
+    user_id: uuid.UUID
+    conditions: dict[str, Any] | list[Any] | None = None
+    allergies: dict[str, Any] | list[Any] | None = None
+    medications: dict[str, Any] | list[Any] | None = None
+
+    model_config = {"from_attributes": True}
+
+
+class ProfileMeResponse(BaseModel):
+    user_id: uuid.UUID
+    region: str | None = None
+    consent_flags: dict[str, Any] | list[Any] | None = None
+    health_profile: HealthProfileOut | None = None
+    latest_checkin: DailyCheckInOut | None = None
+    active_weekly_plan: WeeklyPlanOut | None = None

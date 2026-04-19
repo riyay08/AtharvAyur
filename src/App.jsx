@@ -65,7 +65,7 @@ function buildAssessment(answers) {
   };
 }
 
-function createProfilePayload(assessment, answers, existingUserId) {
+function createProfilePayload(assessment, answers) {
   const selectedAnswers = QUIZ_QUESTIONS.map((q) => ({
     question_id: q.id,
     question_text: q.prompt,
@@ -74,7 +74,6 @@ function createProfilePayload(assessment, answers, existingUserId) {
   }));
 
   return {
-    ...(existingUserId ? { user_id: existingUserId } : {}),
     consent_flags: {
       prakriti_quiz_completed: true,
       app: "holistica_web",
@@ -155,7 +154,7 @@ function App() {
     setContinueError(null);
     setContinueLoading(true);
     try {
-      const payload = createProfilePayload(assessment, answers, backendUserId || undefined);
+      const payload = createProfilePayload(assessment, answers);
       const result = await upsertProfile(payload);
       setStoredUserId(result.user_id);
       setBackendUserId(result.user_id);

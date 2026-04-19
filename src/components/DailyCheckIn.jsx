@@ -171,7 +171,7 @@ export function DailyCheckIn({ userId }) {
     setWeekLoading(true);
     setWeekError(null);
     try {
-      const data = await getCheckInWeek(userId, localYmd());
+      const data = await getCheckInWeek(localYmd());
       setWeekData(data);
     } catch (e) {
       setWeekError(e instanceof Error ? e.message : "Could not load check-ins.");
@@ -220,7 +220,7 @@ export function DailyCheckIn({ userId }) {
     setStatus("loading");
     setMessage(null);
     try {
-      const saved = await postCheckIn(userId, {
+      const saved = await postCheckIn({
         check_in_date: selectedDate,
         sleep_quality: sleepQuality,
         digestion,
@@ -228,7 +228,7 @@ export function DailyCheckIn({ userId }) {
         movement,
         water_glasses: water,
       });
-      const refreshed = await getCheckInWeek(userId, localYmd());
+      const refreshed = await getCheckInWeek(localYmd());
       setWeekData(refreshed);
       const ymd = normYmd(saved.check_in_date) || selectedDate;
       setSelectedDate(ymd);

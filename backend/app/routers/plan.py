@@ -3,15 +3,14 @@ from __future__ import annotations
 import copy
 import json
 import logging
-import uuid
 from datetime import date
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 from sqlalchemy.orm.attributes import flag_modified
 
-from app.dependencies import get_db
+from app.dependencies import get_current_user, get_db
 from app.models.audit_log import AuditLog
 from app.models.health_profile import HealthProfile
 from app.models.user import User
@@ -48,18 +47,15 @@ def _pillar_task_list(pillars: dict, pillar_name: str) -> list | None:
 def generate_weekly_plan(
     body: PlanGenerateRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> WeeklyPlanOut:
-    user = db.get(User, body.user_id)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
-
     profile = db.execute(
-        select(HealthProfile).where(HealthProfile.user_id == user.id)
+        select(HealthProfile).where(HealthProfile.user_id == current_user.id)
     ).scalar_one_or_none()
 
     week_start = body.week_start or week_start_monday(date.today())
     try:
-        payload = generate_weekly_plan_via_llm(db, user.id, profile, week_start=week_start)
+        payload = generate_weekly_plan_via_llm(db, current_user.id, profile, week_start=week_start)
     except OrchestratorConfigError as exc:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -71,10 +67,10 @@ def generate_weekly_plan(
             detail=f"Weekly plan generation failed: {exc}",
         ) from exc
 
-    plan = upsert_weekly_plan(db, user.id, week_start, payload)
+    plan = upsert_weekly_plan(db, current_user.id, week_start, payload)
     db.add(
         AuditLog(
-            actor=str(user.id),
+            actor=str(current_user.id),
             action=f"plan.generate week_start={week_start}",
         )
     )
@@ -85,13 +81,10 @@ def generate_weekly_plan(
 
 @router.get("/plan/current", response_model=WeeklyPlanOut | None)
 def get_current_plan(
-    user_id: uuid.UUID = Query(..., description="User UUID"),
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> WeeklyPlanOut | None:
-    user = db.get(User, user_id)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
-    plan = get_current_week_plan(db, user_id, date.today())
+    plan = get_current_week_plan(db, current_user.id, date.today())
     if plan is None:
         return None
     return WeeklyPlanOut.model_validate(plan)
@@ -101,24 +94,23 @@ def get_current_plan(
 def update_plan_task(
     body: PlanTaskUpdateRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> WeeklyPlanOut:
-    user = db.get(User, body.user_id)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
-
     profile = db.execute(
-        select(HealthProfile).where(HealthProfile.user_id == user.id)
+        select(HealthProfile).where(HealthProfile.user_id == current_user.id)
     ).scalar_one_or_none()
 
     if body.plan_id is not None:
-        plan = db.get(WeeklyPlan, body.plan_id)
-        if plan is None or plan.user_id != body.user_id:
+        plan = db.execute(
+            select(WeeklyPlan).where(WeeklyPlan.id == body.plan_id, WeeklyPlan.user_id == current_user.id)
+        ).scalar_one_or_none()
+        if plan is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Weekly plan not found for this user.",
             )
     else:
-        plan = get_current_week_plan(db, body.user_id, date.today())
+        plan = get_current_week_plan(db, current_user.id, date.today())
         if plan is None:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -199,7 +191,7 @@ def update_plan_task(
         try:
             follow = generate_followup_pillar_task(
                 db,
-                user.id,
+                current_user.id,
                 profile,
                 body.pillar,
                 completed_snapshot.get("task", ""),
@@ -222,7 +214,7 @@ def update_plan_task(
     flag_modified(plan, "tasks")
     db.add(
         AuditLog(
-            actor=str(body.user_id),
+            actor=str(current_user.id),
             action="plan.task_update",
         )
     )

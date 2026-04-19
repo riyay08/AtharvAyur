@@ -24,7 +24,6 @@ MovementLiteral = Literal["rest", "light", "sweat"]
 
 
 class DailyCheckInCreate(BaseModel):
-    user_id: UUID
     check_in_date: date | None = Field(
         default=None,
         description="Calendar date for this check-in; defaults to today (server date).",
@@ -51,7 +50,7 @@ class DailyCheckInOut(BaseModel):
 
 
 class DailyCheckInWeekSlot(BaseModel):
-    """One calendar day in the rolling 7-day window (oldest → newest)."""
+    """One calendar day in the rolling 7-day window (oldest -> newest)."""
 
     check_in_date: date
     record: DailyCheckInOut | None = None

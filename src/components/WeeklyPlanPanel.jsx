@@ -35,7 +35,7 @@ export function WeeklyPlanPanel({ userId }) {
     setLoading(true);
     setError(null);
     try {
-      const data = await getCurrentPlan(userId);
+      const data = await getCurrentPlan();
       setPlan(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not load plan.");
@@ -58,7 +58,7 @@ export function WeeklyPlanPanel({ userId }) {
     setGenLoading(true);
     setError(null);
     try {
-      const data = await generateWeeklyPlan(userId);
+      const data = await generateWeeklyPlan();
       setPlan(data);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not generate plan.");

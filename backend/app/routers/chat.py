@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db
+from app.dependencies import get_current_user, get_db
 from app.models.audit_log import AuditLog
 from app.models.chat_history import ChatHistory, ChatRole
 from app.models.health_profile import HealthProfile
@@ -25,23 +25,17 @@ router = APIRouter(tags=["chat"])
 async def chat_turn(
     body: ChatRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> ChatResponse:
-    user = db.get(User, body.user_id)
-    if user is None:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User not found.",
-        )
-
     profile = db.execute(
-        select(HealthProfile).where(HealthProfile.user_id == user.id)
+        select(HealthProfile).where(HealthProfile.user_id == current_user.id)
     ).scalar_one_or_none()
 
     safety = evaluate_message(body.message, health_profile=profile)
     if not safety.allowed:
         db.add(
             AuditLog(
-                actor=str(user.id),
+                actor=str(current_user.id),
                 action=f"chat.safety_block reason={safety.reason.value} terms={','.join(safety.matched_terms)}",
             )
         )
@@ -64,7 +58,7 @@ async def chat_turn(
         result = generate_health_reply(
             body.message,
             db=db,
-            user_id=user.id,
+            user_id=current_user.id,
             health_profile=profile,
             environment_context=env_ctx,
         )
@@ -81,13 +75,13 @@ async def chat_turn(
         ) from exc
 
     user_row = ChatHistory(
-        user_id=user.id,
+        user_id=current_user.id,
         role=ChatRole.USER,
         message=body.message,
         embedding=list(result.prompt_embedding) if result.prompt_embedding else None,
     )
     assistant_row = ChatHistory(
-        user_id=user.id,
+        user_id=current_user.id,
         role=ChatRole.ASSISTANT,
         message=result.response_text,
     )
@@ -95,7 +89,7 @@ async def chat_turn(
     db.add(assistant_row)
     db.add(
         AuditLog(
-            actor=str(user.id),
+            actor=str(current_user.id),
             action="chat.turn_completed",
         )
     )

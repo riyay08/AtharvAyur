@@ -9,9 +9,11 @@ from __future__ import annotations
 
 import json
 import logging
+import re
 import uuid
 from dataclasses import dataclass
 from typing import Any
+from urllib.parse import urlparse
 
 from google import genai
 from google.genai import types
@@ -29,6 +31,41 @@ logger = logging.getLogger(__name__)
 # Must match `ChatHistory.embedding` column (pgvector).
 _EMBEDDING_DIM = 768
 
+# Authoritative grounding: host/path must look high-trust; commerce patterns rejected.
+_TRUSTED_HOST_MARKERS: tuple[str, ...] = (
+    ".gov",
+    ".edu",
+    ".ac.uk",
+    ".mil",
+    "nih.gov",
+    "cdc.gov",
+    "who.int",
+    "nhs.uk",
+    "mayoclinic.org",
+    "clevelandclinic.org",
+    "hopkinsmedicine.org",
+    "webmd.com",
+    "merckmanuals.com",
+    "ncbi.nlm.nih.gov",
+    "pubmed.ncbi.nlm.nih.gov",
+    "thelancet.com",
+    "lancet.com",
+    "nejm.org",
+    "bmj.com",
+    "statnews.com",
+)
+_FORBIDDEN_URL_KEYWORDS: tuple[str, ...] = (
+    "shop",
+    "buy",
+    "store",
+    "product",
+    "cart",
+    "sales",
+)
+
+_VERIFICATION_FALLBACK = (
+    "I cannot find clinical or governmental verification for this specific practice at this time."
+)
 
 class OrchestratorConfigError(RuntimeError):
     """Missing configuration (e.g. API key)."""
@@ -48,6 +85,81 @@ class OrchestratorResult:
     finish_reason: str | None = None
     blocked_by_model_safety: bool = False
     prompt_embedding: tuple[float, ...] | None = None
+
+
+_STRICT_SEARCH_PROTOCOL = """[STRICT SEARCH PROTOCOL]
+1. SEARCH OPERATOR ENFORCEMENT: When you generate search queries to ground your response, you MUST append advanced search operators to restrict results to trusted tiers. Your internal queries should prioritize strings like:
+   - "[Topic] site:.gov OR site:.edu OR site:who.int"
+   - "[Topic] site:mayoclinic.org OR site:clevelandclinic.org OR site:nih.gov"
+
+2. SOURCE HIERARCHY: You must prioritize information in this order:
+   - Tier 1 (Gold Standard): Peer-reviewed journals (PubMed, Lancet), Government agencies (NIH, CDC, NHS), and International bodies (WHO).
+   - Tier 2 (Clinical Excellence): Academic medical centers (Mayo Clinic, Cleveland Clinic, Johns Hopkins).
+   - Tier 3 (Reliable Medical Press): WebMD, Merck Manuals, or STAT News (use only if Tier 1 and 2 are unavailable).
+   - TIER 4 (FORBIDDEN): Strictly ignore supplement stores, commercial blogs (.coms without clinical backing), Reddit, Quora, and SEO-farmed wellness sites.
+
+3. VERIFICATION HABIT: If a search returns a result from a Tier 4 source, you must discard that data. If no Tier 1-3 sources can verify a claim, you must state: "I cannot find clinical or governmental verification for this specific practice at this time."
+[END SEARCH PROTOCOL]"""
+
+
+def _hostname(url: str) -> str:
+    try:
+        host = urlparse(url).hostname
+        return (host or "").lower()
+    except Exception:
+        return ""
+
+
+def _url_passes_authoritative_grounding(url: str) -> bool:
+    if not isinstance(url, str):
+        return False
+    u = url.strip()
+    if not (u.startswith("http://") or u.startswith("https://")):
+        return False
+    host = _hostname(u)
+    if not host:
+        return False
+    # Commerce / spam signals: check host only so path words like "restore" do not false-positive "store".
+    for bad in _FORBIDDEN_URL_KEYWORDS:
+        if bad in host:
+            return False
+    for marker in _TRUSTED_HOST_MARKERS:
+        if marker.startswith(".") and host.endswith(marker):
+            return True
+        if marker in host:
+            return True
+    return False
+
+
+def _filter_trusted_grounding_citations(
+    citations: list[SourceCitation],
+) -> tuple[list[SourceCitation], set[str], int]:
+    """Returns (trusted_citations, trusted_url_set, raw_count_before_filter)."""
+    raw_count = len(citations)
+    trusted: list[SourceCitation] = []
+    seen: set[str] = set()
+    for c in citations:
+        if not _url_passes_authoritative_grounding(c.url):
+            logger.info("Grounding citation rejected by trust filter: %s", c.url[:120])
+            continue
+        if c.url in seen:
+            continue
+        seen.add(c.url)
+        trusted.append(c)
+    return trusted, seen, raw_count
+
+
+def _strip_untrusted_urls_from_response_text(text: str, removed_urls: set[str]) -> str:
+    """Remove obvious markdown links and bare URLs that were stripped from citations."""
+    if not text or not removed_urls:
+        return text
+    out = text
+    for u in sorted(removed_urls, key=len, reverse=True):
+        esc = re.escape(u)
+        out = re.sub(rf"\[[^\]]*\]\(\s*{esc}\s*\)", "", out, flags=re.IGNORECASE)
+        out = out.replace(u, "")
+    out = re.sub(r"\n{3,}", "\n\n", out).strip()
+    return out
 
 
 def _flatten_profile_json(value: Any) -> str:
@@ -129,8 +241,10 @@ def _build_system_instruction(
 CORE DIRECTIVES:
 1. THE PIVOT (Never aggressively refuse): If a user mentions a symptom (e.g., "I have bloating"), DO NOT say "I cannot help you" or "I am an AI." Instead, acknowledge the symptom, state clearly that you cannot diagnose the underlying cause, and immediately PIVOT to providing general, safe, educational lifestyle and Ayurvedic tips relevant to their profile.
 2. MEMORY RELEVANCE: You will be provided with "Relevant Past History". Only reference this history IF it naturally helps answer the user's current question. If the user just says "Hello", do NOT bring up their past medical issues.
-3. CITATION INTEGRITY (No fake links): You will use the Google Search tool to find evidence. You MUST NOT invent, guess, or hallucinate URLs. If the search tool does not provide a reputable link for a claim, you must state: "I do not have verified information on this specific topic."
+3. CITATION INTEGRITY (No fake links): You will use the Google Search tool to find evidence. You MUST NOT invent, guess, or hallucinate URLs. If the search tool does not provide a reputable link for a claim, you must state: "I do not have verified information on this specific topic." When search grounding is used, follow the strict search protocol below for query formulation and source acceptance.
 4. UNIFIED SAFETY: Treat all paradigms equally. Do not prescribe Ayurvedic herbs as if they are harmless. If a user asks about taking a supplement/herb, you MUST check their HealthProfile for medications and explicitly state if there are potential interactions, or advise them to check with their doctor.
+
+{_STRICT_SEARCH_PROTOCOL}
 
 {env_block}You must return JSON with this exact schema:
 {{
@@ -237,6 +351,7 @@ def _safe_json_response(raw_text: str) -> dict[str, Any]:
 
 
 def _normalize_citations(parsed: dict[str, Any], allowed_urls: set[str]) -> list[SourceCitation]:
+    """Keep only citations whose URLs are in ``allowed_urls`` (trusted grounded URLs)."""
     normalized: list[SourceCitation] = []
     seen: set[str] = set()
     raw = parsed.get("citations")
@@ -252,13 +367,36 @@ def _normalize_citations(parsed: dict[str, Any], allowed_urls: set[str]) -> list
         u = url.strip()
         if not (u.startswith("http://") or u.startswith("https://")):
             continue
-        if allowed_urls and u not in allowed_urls:
+        if not allowed_urls or u not in allowed_urls:
             continue
         if u in seen:
             continue
         seen.add(u)
         normalized.append(SourceCitation(source_name=source_name.strip() or u, url=u))
     return normalized
+
+
+def _urls_in_response_text(text: str) -> set[str]:
+    found: set[str] = set()
+    for m in re.finditer(r"https?://[^\s)\]\"'<>]+", text or ""):
+        found.add(m.group(0).rstrip(".,);"))
+    return found
+
+
+def _strip_untrusted_urls_from_free_text(text: str) -> str:
+    """Remove bare URLs and markdown links pointing at hosts that fail the trust filter."""
+    if not text:
+        return text
+    out = text
+    for m in list(re.finditer(r"https?://[^\s)\]\"'<>]+", out)):
+        u = m.group(0).rstrip(".,);")
+        if _url_passes_authoritative_grounding(u):
+            continue
+        esc = re.escape(u)
+        out = re.sub(rf"\[[^\]]*\]\(\s*{esc}\s*\)", "", out, flags=re.IGNORECASE)
+        out = out.replace(u, "")
+    out = re.sub(r"\n{3,}", "\n\n", out).strip()
+    return out
 
 
 def _embed_text(client: genai.Client, text: str) -> list[float]:
@@ -424,18 +562,43 @@ def generate_health_reply(
         raw_text = '{"response_text":"The model did not return a response. Please try again later.","citations":[]}'
 
     parsed = _safe_json_response(raw_text)
-    fallback_cites, queries, grounded_urls = _extract_grounding_urls(response)
-    cites = _normalize_citations(parsed, grounded_urls)
-    if not cites:
-        cites = fallback_cites
+    fallback_cites_raw, queries, _ = _extract_grounding_urls(response)
+    raw_grounding_count = len(fallback_cites_raw)
+    trusted_grounding, trusted_urls, _ = _filter_trusted_grounding_citations(fallback_cites_raw)
+    all_grounding_rejected = raw_grounding_count > 0 and len(trusted_grounding) == 0
+
+    removed_urls: set[str] = {
+        c.url for c in fallback_cites_raw if not _url_passes_authoritative_grounding(c.url)
+    }
+
+    parsed_aligned = _normalize_citations(parsed, trusted_urls)
+    name_by_url = {c.url: c.source_name for c in parsed_aligned}
+
+    cites_list: list[SourceCitation] = [
+        SourceCitation(source_name=name_by_url.get(c.url, c.source_name), url=c.url) for c in trusted_grounding
+    ]
 
     response_text = parsed.get("response_text")
     if not isinstance(response_text, str) or not response_text.strip():
-        response_text = raw_text
+        response_text = raw_text if isinstance(raw_text, str) else ""
+
+    response_text_out = response_text.strip()
+
+    if all_grounding_rejected:
+        response_text_out = _VERIFICATION_FALLBACK
+        cites_list = []
+    else:
+        if trusted_urls:
+            for u in _urls_in_response_text(response_text_out):
+                if u not in trusted_urls:
+                    removed_urls.add(u)
+            response_text_out = _strip_untrusted_urls_from_response_text(response_text_out, removed_urls)
+        else:
+            response_text_out = _strip_untrusted_urls_from_free_text(response_text_out)
 
     return OrchestratorResult(
-        response_text=response_text.strip(),
-        citations=tuple(cites),
+        response_text=response_text_out,
+        citations=tuple(cites_list),
         web_search_queries=tuple(queries),
         finish_reason=finish,
         blocked_by_model_safety=safety_stopped,

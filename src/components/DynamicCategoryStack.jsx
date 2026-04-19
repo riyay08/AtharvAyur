@@ -97,7 +97,6 @@ export function DynamicCategoryStack({ plan, userId, weekDayIndex, onPlanUpdated
       try {
         setBusy(true);
         const updated = await putPlanTask({
-          user_id: userId,
           plan_id: plan.id,
           day_index: dayIndex,
           pillar: pillarKey,

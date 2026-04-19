@@ -46,7 +46,7 @@ export function DailyEnvironmentTip({ userId, latitude, longitude, geoStatus }) 
     let cancelled = false;
     setLoading(true);
     setError(null);
-    postEnvironmentDailyTip(userId, latitude, longitude)
+    postEnvironmentDailyTip(latitude, longitude)
       .then((res) => {
         if (!cancelled) {
           setData(res);

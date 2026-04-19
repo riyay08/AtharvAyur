@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.dependencies import get_db
+from app.dependencies import get_current_user, get_db
 from app.models.audit_log import AuditLog
 from app.models.daily_environment_tip import DailyEnvironmentTip
 from app.models.health_profile import HealthProfile
@@ -53,15 +53,12 @@ def _tip_to_out(row: DailyEnvironmentTip, *, cached: bool) -> DailyEnvironmentTi
 async def create_or_get_daily_environment_tip(
     body: DailyEnvironmentTipRequest,
     db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
 ) -> DailyEnvironmentTipOut:
-    user = db.get(User, body.user_id)
-    if user is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found.")
-
     tip_date = _utc_today()
     existing = db.execute(
         select(DailyEnvironmentTip).where(
-            DailyEnvironmentTip.user_id == body.user_id,
+            DailyEnvironmentTip.user_id == current_user.id,
             DailyEnvironmentTip.tip_date == tip_date,
         )
     ).scalar_one_or_none()
@@ -77,7 +74,7 @@ async def create_or_get_daily_environment_tip(
         ) from exc
 
     profile = db.execute(
-        select(HealthProfile).where(HealthProfile.user_id == user.id)
+        select(HealthProfile).where(HealthProfile.user_id == current_user.id)
     ).scalar_one_or_none()
     dosha = _dominant_dosha_from_profile(profile)
 
@@ -87,7 +84,7 @@ async def create_or_get_daily_environment_tip(
     )
 
     row = DailyEnvironmentTip(
-        user_id=body.user_id,
+        user_id=current_user.id,
         tip_date=tip_date,
         tip_title=tip_payload["tip_title"],
         tip_description=tip_payload["tip_description"],
@@ -96,7 +93,7 @@ async def create_or_get_daily_environment_tip(
     db.add(row)
     db.add(
         AuditLog(
-            actor=str(body.user_id),
+            actor=str(current_user.id),
             action=f"environment.daily_tip_generated date={tip_date}",
         )
     )

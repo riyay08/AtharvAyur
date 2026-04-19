@@ -8,7 +8,6 @@ from pydantic import BaseModel, Field
 
 
 class PlanGenerateRequest(BaseModel):
-    user_id: UUID
     week_start: date | None = Field(
         default=None,
         description="Monday of the plan week; defaults to Monday of the current calendar week.",
@@ -26,7 +25,6 @@ class WeeklyPlanOut(BaseModel):
 
 
 class PlanTaskUpdateRequest(BaseModel):
-    user_id: UUID
     plan_id: UUID | None = Field(
         default=None,
         description="Weekly plan id; if omitted, the current week's plan for the user is used.",

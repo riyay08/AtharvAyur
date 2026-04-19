@@ -1,6 +1,7 @@
 /** HolisticAI Health backend — use VITE_API_URL or dev proxy `/api` → FastAPI :8000 */
 
 const USER_STORAGE_KEY = "holistica_user_id";
+const ACCESS_TOKEN_KEY = "holistica_access_token";
 
 export function getStoredUserId() {
   try {
@@ -26,9 +27,34 @@ export function clearStoredUserId() {
   }
 }
 
-/** Clears saved user id + onboarding flag (e.g. to show the quiz again). */
+export function getStoredAccessToken() {
+  try {
+    return localStorage.getItem(ACCESS_TOKEN_KEY);
+  } catch {
+    return null;
+  }
+}
+
+export function setStoredAccessToken(token) {
+  try {
+    localStorage.setItem(ACCESS_TOKEN_KEY, token);
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearStoredAccessToken() {
+  try {
+    localStorage.removeItem(ACCESS_TOKEN_KEY);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Clears saved user id, JWT, and onboarding flag (e.g. to show the quiz again). */
 export function clearHolisticaSession() {
   clearStoredUserId();
+  clearStoredAccessToken();
   try {
     localStorage.removeItem("holistica_has_completed_onboarding");
   } catch {
@@ -63,13 +89,61 @@ function formatError(status, body) {
   return `Request failed (${status})`;
 }
 
+let _sessionInFlight = null;
+
 /**
- * @param {object} payload - ProfileUpsertRequest shape (optional user_id for updates)
+ * Ensures a JWT exists (creates a user when none is stored, or re-mints for stored user id).
+ * Safe to call from multiple components concurrently.
+ */
+export async function ensureSession() {
+  if (getStoredAccessToken()) return;
+  if (!_sessionInFlight) {
+    _sessionInFlight = (async () => {
+      const attempt = async (body) => {
+        const res = await fetch(apiUrl("/auth/token"), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+        const data = await res.json().catch(() => ({}));
+        return { res, data };
+      };
+
+      let body = {};
+      const sid = getStoredUserId();
+      if (sid) body.user_id = sid;
+      let { res, data } = await attempt(body);
+      if (res.status === 404 && sid) {
+        clearStoredUserId();
+        ({ res, data } = await attempt({}));
+      }
+      if (!res.ok) throw new Error(formatError(res.status, data));
+      setStoredAccessToken(data.access_token);
+      if (data.user_id) setStoredUserId(String(data.user_id));
+    })().finally(() => {
+      _sessionInFlight = null;
+    });
+  }
+  await _sessionInFlight;
+}
+
+function authHeaders() {
+  const t = getStoredAccessToken();
+  return t ? { Authorization: `Bearer ${t}` } : {};
+}
+
+function jsonHeadersWithAuth() {
+  return { "Content-Type": "application/json", ...authHeaders() };
+}
+
+/**
+ * @param {object} payload - ProfileUpsertRequest shape
  */
 export async function upsertProfile(payload) {
+  await ensureSession();
   const res = await fetch(apiUrl("/profile"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: jsonHeadersWithAuth(),
     body: JSON.stringify(payload),
   });
   const data = await res.json().catch(() => ({}));
@@ -78,12 +152,12 @@ export async function upsertProfile(payload) {
 }
 
 /**
- * @param {string} userId - UUID
  * @param {string} message
  * @param {{ latitude?: number, longitude?: number }} [coords]
  */
-export async function sendChatMessage(userId, message, coords) {
-  const body = { user_id: userId, message };
+export async function sendChatMessage(message, coords) {
+  await ensureSession();
+  const body = { message };
   if (
     coords &&
     typeof coords.latitude === "number" &&
@@ -94,7 +168,7 @@ export async function sendChatMessage(userId, message, coords) {
   }
   const res = await fetch(apiUrl("/chat"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: jsonHeadersWithAuth(),
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
@@ -103,7 +177,6 @@ export async function sendChatMessage(userId, message, coords) {
 }
 
 /**
- * @param {string} userId
  * @param {{
  *   check_in_date?: string,
  *   sleep_quality: 'heavy'|'restless'|'refreshed',
@@ -113,11 +186,12 @@ export async function sendChatMessage(userId, message, coords) {
  *   water_glasses: number
  * }} payload
  */
-export async function postCheckIn(userId, payload) {
+export async function postCheckIn(payload) {
+  await ensureSession();
   const res = await fetch(apiUrl("/checkin"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId, ...payload }),
+    headers: jsonHeadersWithAuth(),
+    body: JSON.stringify(payload),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(formatError(res.status, data));
@@ -126,16 +200,15 @@ export async function postCheckIn(userId, payload) {
 
 /**
  * Cached daily environment tip (per user, per UTC day on server).
- * @param {string} userId
  * @param {number} latitude
  * @param {number} longitude
  */
-export async function postEnvironmentDailyTip(userId, latitude, longitude) {
+export async function postEnvironmentDailyTip(latitude, longitude) {
+  await ensureSession();
   const res = await fetch(apiUrl("/environment/daily-tip"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: jsonHeadersWithAuth(),
     body: JSON.stringify({
-      user_id: userId,
       latitude,
       longitude,
     }),
@@ -146,34 +219,36 @@ export async function postEnvironmentDailyTip(userId, latitude, longitude) {
 }
 
 /**
- * @param {string} userId
  * @param {string} [endDateYmd] - Client local YYYY-MM-DD for window end (today); aligns 7-day strip with UI.
  */
-export async function getCheckInWeek(userId, endDateYmd) {
-  const q = new URLSearchParams({ user_id: userId });
+export async function getCheckInWeek(endDateYmd) {
+  await ensureSession();
+  const q = new URLSearchParams();
   if (endDateYmd) q.set("end_date", endDateYmd);
-  const res = await fetch(`${apiUrl("/checkin/week")}?${q}`);
+  const qs = q.toString();
+  const url = qs ? `${apiUrl("/checkin/week")}?${qs}` : apiUrl("/checkin/week");
+  const res = await fetch(url, { headers: authHeaders() });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(formatError(res.status, data));
   return data;
 }
 
-/** @param {string} userId */
-export async function getCurrentPlan(userId) {
-  const q = new URLSearchParams({ user_id: userId });
-  const res = await fetch(`${apiUrl("/plan/current")}?${q}`);
-  const data = await res.json().catch(() => null);
+export async function getCurrentPlan() {
+  await ensureSession();
+  const res = await fetch(apiUrl("/plan/current"), { headers: authHeaders() });
+  const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(formatError(res.status, data || {}));
   return data;
 }
 
 /**
- * @param {{ user_id: string, plan_id?: string | null, day_index: number, pillar: 'Mind'|'Fuel'|'Body', task_id: number, completed?: boolean | null }} body
+ * @param {{ plan_id?: string | null, day_index: number, pillar: 'Mind'|'Fuel'|'Body', task_id: number, completed?: boolean | null }} body
  */
 export async function putPlanTask(body) {
+  await ensureSession();
   const res = await fetch(apiUrl("/plan/task"), {
     method: "PUT",
-    headers: { "Content-Type": "application/json" },
+    headers: jsonHeadersWithAuth(),
     body: JSON.stringify(body),
   });
   const data = await res.json().catch(() => ({}));
@@ -181,12 +256,12 @@ export async function putPlanTask(body) {
   return data;
 }
 
-/** @param {string} userId */
-export async function generateWeeklyPlan(userId) {
+export async function generateWeeklyPlan() {
+  await ensureSession();
   const res = await fetch(apiUrl("/plan/generate"), {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ user_id: userId }),
+    headers: jsonHeadersWithAuth(),
+    body: JSON.stringify({}),
   });
   const data = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(formatError(res.status, data));

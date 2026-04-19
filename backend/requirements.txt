@@ -20,3 +20,6 @@ google-genai>=1.0.0
 
 # Scheduled jobs
 apscheduler>=3.10.0
+
+# Auth
+python-jose[cryptography]>=3.3.0
