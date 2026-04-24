@@ -1,12 +1,14 @@
 # AWS single-EC2 style: Postgres (pgvector) + API on one host.
+#
+# Expects a populated backend/.env on the host. At minimum set:
+#   HOLISTICA_DB_PASSWORD, JWT_SECRET_KEY, LLM_PROVIDER, GROQ_API_KEY (or GEMINI_API_KEY),
+#   CORS_ORIGINS, WEBAUTHN_RP_ID, WEBAUTHN_RP_NAME, WEBAUTHN_ORIGIN, OPENWEATHER_API_KEY
+#
 # Usage on server (from backend/):
-#   export HOLISTICA_DB_PASSWORD='choose-a-strong-password'
-#   export GEMINI_API_KEY='...'
-#   export OPENWEATHER_API_KEY='...'   # optional
-#   export CORS_ORIGINS='https://YOUR_CLOUDFRONT_OR_S3_WEBSITE_URL'
 #   docker compose -f docker-compose.aws.yml up -d --build
 #
-# DATABASE_URL uses the Docker service name `db` (internal network).
+# DATABASE_URL is injected here (not via .env) because it must reference the
+# Docker service name `db` on the internal network.
 
 services:
   db:
@@ -29,11 +31,11 @@ services:
     restart: unless-stopped
     ports:
       - "8000:8000"
+    env_file:
+      - .env
     environment:
+      # Override DATABASE_URL so it points at the Docker service, not localhost.
       DATABASE_URL: postgresql+psycopg2://holistica:${HOLISTICA_DB_PASSWORD:-holistica}@db:5432/holistica_health
-      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
-      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY:-}
-      CORS_ORIGINS: ${CORS_ORIGINS:-http://localhost:5173}
     depends_on:
       db:
         condition: service_healthy
