@@ -16,8 +16,11 @@ from app.models import (  # noqa: E402, F401
     AuditLog,
     ChatHistory,
     DailyCheckIn,
+    DailyEnvironmentTip,
     HealthProfile,
+    PhoneOtp,
     User,
+    WebAuthnCredential,
     WeeklyPlan,
 )
 

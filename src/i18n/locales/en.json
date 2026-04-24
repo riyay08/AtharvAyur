@@ -1,0 +1,212 @@
+{
+  "language": {
+    "label": "Language",
+    "english": "English",
+    "hindi": "हिन्दी"
+  },
+  "common": {
+    "loading": "Loading…",
+    "back": "Back",
+    "next": "Next",
+    "save": "Save",
+    "cancel": "Cancel",
+    "or": "or",
+    "logIn": "Log in",
+    "signUp": "Sign up",
+    "logOut": "Log out",
+    "email": "Email",
+    "password": "Password",
+    "phone": "Phone",
+    "phoneNumber": "Phone number",
+    "displayName": "Display name",
+    "optional": "(optional)",
+    "errorGeneric": "Something went wrong.",
+    "retry": "Try again"
+  },
+  "brand": {
+    "appName": "AtharvAyur",
+    "appTagline": "HolisticAI Health"
+  },
+  "auth": {
+    "loginTitle": "Welcome back",
+    "loginSubtitle": "Sign in to pick up your wellness plan and chat where you left off.",
+    "signupTitle": "Create your account",
+    "signupSubtitle": "Save your dosha profile, plan, and chat history securely across devices.",
+    "noAccount": "New here?",
+    "hasAccount": "Already have an account?",
+    "switchToSignup": "Create an account",
+    "switchToLogin": "Log in instead",
+    "tabs": {
+      "email": "Email",
+      "phone": "Phone",
+      "passkey": "Passkey"
+    },
+    "emailPlaceholder": "you@example.com",
+    "phonePlaceholder": "+14155551234",
+    "passwordPlaceholder": "••••••••",
+    "passwordHint": "At least 8 characters",
+    "namePlaceholder": "Alex Patel",
+    "otpLabel": "6-digit code",
+    "otpPlaceholder": "000000",
+    "sendOtp": "Send verification code",
+    "verifyOtp": "Verify and log in",
+    "verifyOtpSignup": "Verify and continue",
+    "createAccount": "Create account",
+    "passkeyDescription": "Use a saved passkey on this device (Touch ID, Face ID, Windows Hello, hardware key).",
+    "passkeyEmailHint": "Email (optional, narrows the prompt)",
+    "passkeyContinue": "Continue with a passkey",
+    "passkeyUnsupported": "Your browser/device doesn't expose passkeys. Use email or phone for now.",
+    "errors": {
+      "invalidEmail": "Enter a valid email address.",
+      "invalidPhone": "Enter a valid phone number including country code (e.g. +14155551234).",
+      "passwordRequired": "Enter your password.",
+      "passwordTooShort": "Password must be at least 8 characters.",
+      "otpRequired": "Enter the 6-digit code we sent you.",
+      "googleNoToken": "Google sign-in didn't return a token. Try again."
+    },
+    "info": {
+      "smsSent": "We just texted you a 6-digit code.",
+      "devCode": "Dev mode: your code is {{code}} (expires in 10 min)."
+    }
+  },
+  "security": {
+    "drawerLabel": "Account & security",
+    "title": "Security settings",
+    "signedInAs": "Signed in as",
+    "fields": {
+      "displayName": "Display name",
+      "email": "Email",
+      "phone": "Phone",
+      "method": "Login method"
+    },
+    "passkeyTitle": "Passkey on this device",
+    "passkeyDescription": "Register a passkey (Face ID, Touch ID, Windows Hello, hardware key) so you can log in without typing your password.",
+    "passkeyUnsupported": "This browser/device doesn't support passkeys.",
+    "passkeyRegister": "Register a passkey",
+    "passkeySuccess": "Passkey registered. You can now sign in faster on this device."
+  },
+  "header": {
+    "hubTitle": "Your wellness hub",
+    "hubSubtitle": "Daily check-in, your weekly Ayurvedic-inspired plan, and grounded chat — all tailored to your profile.",
+    "updateAssessment": "Update assessment",
+    "security": "Security"
+  },
+  "checkin": {
+    "label": "Daily ritual",
+    "title": "Quick check-in",
+    "subtitle": "Under 15 seconds — tap a day, tap your state, done.",
+    "lastSevenDays": "Last 7 days",
+    "loadingDays": "Loading days…",
+    "noUserHint": "Complete onboarding to track check-ins.",
+    "editing": "Editing",
+    "today": "today",
+    "sleep": "Sleep",
+    "sleepOptions": {
+      "heavy": "Heavy",
+      "restless": "Restless",
+      "refreshed": "Refreshed"
+    },
+    "digestion": "Digestion",
+    "digestionOptions": {
+      "bloated": "Bloated",
+      "acidic": "Acidic",
+      "calm": "Calm"
+    },
+    "energy": "Energy state",
+    "energyOptions": {
+      "wired": "Wired",
+      "grounded": "Grounded",
+      "sluggish": "Sluggish"
+    },
+    "movement": "Movement",
+    "movementOptions": {
+      "rest": "Rest",
+      "light": "Light",
+      "sweat": "Sweat"
+    },
+    "hydration": "Hydration",
+    "glasses": "{{count}} glasses",
+    "glassLabel": "Glass {{n}}",
+    "saving": "Saving…",
+    "logCheckin": "Log check-in",
+    "showForm": "Show check-in form"
+  },
+  "tip": {
+    "label": "Environment & you",
+    "title": "Daily tip",
+    "savedToday": "Today's saved tip",
+    "geoUnsupported": "Location isn't available in this browser.",
+    "geoNeeded": "Allow location to get a personalized environment tip for today."
+  },
+  "plan": {
+    "label": "This week",
+    "title": "Dynamic plan stack",
+    "weekOf": "Week of {{date}}",
+    "generate": "Generate plan",
+    "generating": "Generating…",
+    "noUserHint": "Complete onboarding to see your weekly plan.",
+    "loading": "Loading plan…",
+    "empty": "No plan for this week yet. Tap Generate plan to create one from your profile and recent chat themes.",
+    "legacy": "This plan uses an older format. Tap Generate plan to upgrade to the new Mind / Fuel / Body stack with context.",
+    "outOfRange": "Today may fall outside the week anchored to this plan's start date — we'll still match by calendar day when possible.",
+    "missingDay": "Plan data is missing today's section. Try refreshing or generating a new plan.",
+    "todaysFocus": "Today's focus",
+    "pillarComplete": "{{pillar}} pillar complete",
+    "pillarCompleteSub": "Beautiful rhythm — carry this momentum forward.",
+    "noTasksInPillar": "No tasks in this pillar for today.",
+    "doneCounter": "{{done}}/{{total}} done in {{pillar}}",
+    "markComplete": "Mark complete",
+    "pillars": {
+      "Mind": { "label": "Mind", "blurb": "Nervous system & focus" },
+      "Fuel": { "label": "Fuel", "blurb": "Nourishment & digestion" },
+      "Body": { "label": "Body", "blurb": "Movement & recovery" }
+    }
+  },
+  "chat": {
+    "label": "Assistant",
+    "title": "Personalized chat",
+    "subtitle": "Non-diagnostic guidance with search-backed citations when available.",
+    "panelTitle": "HolisticAI Health",
+    "panelSubtitle": "Non-diagnostic wellness assistant (grounded search when relevant)",
+    "needsOnboardingTitle": "HolisticAI chat",
+    "needsOnboarding": "Save your quiz results with the button above to create your profile and unlock the assistant.",
+    "emptyHint": "Ask a general wellness question. Emergency or crisis language will be blocked before any AI runs.",
+    "thinking": "Thinking…",
+    "send": "Send",
+    "placeholder": "Type a message…",
+    "sources": "Sources",
+    "reason": "Reason: {{reason}}",
+    "matched": "Matched: {{terms}}",
+    "searchQueries": "Search queries: {{queries}}",
+    "modelSafetyNote": "Note: reply may have been limited by model safety filters."
+  },
+  "quiz": {
+    "header": "Dosha Assessment",
+    "welcomeIntro": "Welcome — let's set up your profile",
+    "updateIntro": "Update your profile",
+    "signedInAs": "Signed in as <bold>{{name}}</bold>.",
+    "questionLabel": "Question {{current}} of {{total}}",
+    "resultLabel": "Result: {{dosha}}",
+    "progress": "Progress",
+    "skipQuestion": "Skip this question",
+    "skipRest": "Skip the rest",
+    "backToHub": "Back to hub",
+    "seeResult": "See my result",
+    "distributionTitle": "Dosha distribution",
+    "dominantTitle": "Your dominant dosha",
+    "personalizationNote": "This profile will now personalize your in-app guidance and conversational context.",
+    "continueToPlan": "Continue to my plan",
+    "couldNotSave": "Could not save your profile.",
+    "couldNotSkip": "Could not skip the assessment.",
+    "doshaLabels": {
+      "vata": "Vata",
+      "pitta": "Pitta",
+      "kapha": "Kapha"
+    },
+    "doshaSummaries": {
+      "vata": "Your profile leans Vata. You likely thrive with steady routines, grounding meals, warmth, and intentional wind-down rituals that calm a highly active mind.",
+      "pitta": "Your profile leans Pitta. You likely do best with balanced intensity, cooling habits, and sustainable structure that channels ambition without overheating body or mind.",
+      "kapha": "Your profile leans Kapha. You likely benefit from energizing movement, lighter stimulation, and momentum-building routines that keep motivation and metabolism active."
+    }
+  }
+}

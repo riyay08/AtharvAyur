@@ -1,4 +1,4 @@
-# Optional: Postgres with the same user/password/db as the default DATABASE_URL in .env.example
+# Optional: Postgres + pgvector (required by Alembic migration 20260331_0002).
 # Usage (from backend/):
 #   docker compose up -d
 # If port 5432 is already taken by another Postgres, change the left side: "5433:5432"
@@ -6,7 +6,7 @@
 
 services:
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_USER: holistica
       POSTGRES_PASSWORD: holistica
