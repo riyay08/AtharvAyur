@@ -1,21 +1,27 @@
 import { useState } from "react";
 import { Loader2 } from "lucide-react";
+import { useTranslation } from "react-i18next";
 
 import { AuthProviderContainer } from "./containers/AuthProviderContainer.jsx";
 import { AuthScreenContainer } from "./containers/AuthScreenContainer.jsx";
 import { ChatShellContainer } from "./containers/ChatShellContainer.jsx";
 import { QuizContainer } from "./containers/QuizContainer.jsx";
 import { useAuthContext } from "./viewmodels/AuthContext.js";
+import { isGoogleSignInDisabledByEnv } from "./utils/googleSignInEnv.js";
 
-function googleClientId() {
+/** Google button on login/signup. Set VITE_ENABLE_GOOGLE_SIGNIN=false to use email/phone/passkey only. */
+function googleClientIdForAuthUi() {
+  if (isGoogleSignInDisabledByEnv()) return null;
   const raw = import.meta.env.VITE_GOOGLE_CLIENT_ID;
   return raw && String(raw).trim() ? String(raw).trim() : null;
 }
 
 function FullScreenLoader() {
+  const { t } = useTranslation();
   return (
-    <main className="flex min-h-screen items-center justify-center bg-[#0b0d11] text-slate-300">
-      <Loader2 className="h-6 w-6 animate-spin" />
+    <main className="flex min-h-screen flex-col items-center justify-center gap-4 bg-ink-900 px-6 text-center text-slate-400">
+      <Loader2 className="h-7 w-7 animate-spin text-emerald-400/80" aria-hidden />
+      <p className="max-w-sm text-sm leading-relaxed text-slate-500">{t("common.loadingProfile")}</p>
     </main>
   );
 }
@@ -42,7 +48,7 @@ function AppRoot() {
     return (
       <AuthScreenContainer
         initialMode={authMode}
-        googleClientId={googleClientId()}
+        googleClientId={googleClientIdForAuthUi()}
         onAuthenticated={() => setForceQuiz(false)}
       />
     );

@@ -6,8 +6,9 @@ import logging
 
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import OperationalError, ProgrammingError
+from sqlalchemy.exc import IntegrityError, OperationalError, ProgrammingError
 
+from app.config import settings
 from app.domain.errors import (
     AuthConflictError,
     AuthenticationError,
@@ -82,15 +83,30 @@ def register_exception_handlers(app: FastAPI) -> None:
         )
 
     @app.exception_handler(OperationalError)
-    async def _db_unreachable(_req: Request, _exc: OperationalError) -> JSONResponse:
+    async def _db_unreachable(_req: Request, exc: OperationalError) -> JSONResponse:
+        logger.warning("Database operational error: %s", exc)
+        root = str(exc.orig) if getattr(exc, "orig", None) else str(exc)
+        root = root.strip().split("\n")[0][:220]
+        db_url = (settings.database_url or "").lower()
+        if "sqlite" in db_url:
+            detail = (
+                "SQLite error. Start the API from the backend/ folder so paths resolve, "
+                "or fix DATABASE_URL. "
+                f"Details: {root}"
+            )
+        else:
+            detail = (
+                "PostgreSQL is not reachable. Do this from the backend/ folder: "
+                "(1) docker compose up -d  "
+                "(2) alembic upgrade head  "
+                "(3) restart uvicorn. "
+                "Use DATABASE_URL with 127.0.0.1 (not localhost) on macOS, e.g. "
+                "postgresql+psycopg2://holistica:holistica@127.0.0.1:5432/holistica_health "
+                f"— Raw error: {root}"
+            )
         return JSONResponse(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            content={
-                "detail": (
-                    "Database is unreachable. Start PostgreSQL (from backend/: "
-                    "docker compose up -d) and ensure DATABASE_URL in .env matches."
-                )
-            },
+            content={"detail": detail},
         )
 
     @app.exception_handler(ProgrammingError)
@@ -101,6 +117,19 @@ def register_exception_handlers(app: FastAPI) -> None:
                 "detail": (
                     "Database tables are missing or out of date. From backend/ with your venv "
                     "active, run: alembic upgrade head"
+                )
+            },
+        )
+
+    @app.exception_handler(IntegrityError)
+    async def _db_integrity(_req: Request, exc: IntegrityError) -> JSONResponse:
+        logger.warning("Database integrity error: %s", exc)
+        return JSONResponse(
+            status_code=status.HTTP_409_CONFLICT,
+            content={
+                "detail": (
+                    "Database conflict (duplicate or invalid reference). If this persists, "
+                    "try logging out, clear site data for this origin, and sign in again."
                 )
             },
         )

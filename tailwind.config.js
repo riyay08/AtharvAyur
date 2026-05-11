@@ -3,13 +3,39 @@ export default {
   content: ["./index.html", "./src/**/*.{js,ts,jsx,tsx}"],
   theme: {
     extend: {
+      fontFamily: {
+        sans: [
+          '"DM Sans"',
+          "Inter",
+          "ui-sans-serif",
+          "system-ui",
+          "-apple-system",
+          "Segoe UI",
+          "Roboto",
+          "Helvetica Neue",
+          "Arial",
+          "Noto Sans",
+          "sans-serif",
+        ],
+      },
       colors: {
         vata: "#7EC8E3",
         pitta: "#D98C6B",
         kapha: "#8FAF7A",
+        ink: {
+          950: "#07080c",
+          900: "#0b0d11",
+          850: "#0f1218",
+        },
       },
       boxShadow: {
         wellness: "0 12px 30px rgba(15, 23, 42, 0.08)",
+        panel:
+          "0 0 0 1px rgba(255,255,255,0.06) inset, 0 24px 64px rgba(0,0,0,0.55)",
+        "panel-soft": "0 18px 48px rgba(0,0,0,0.35)",
+      },
+      maxWidth: {
+        measure: "42rem",
       },
       keyframes: {
         "plan-card-exit": {

@@ -18,6 +18,31 @@ const GOV_EDU = Object.freeze({
 });
 
 /**
+ * Turn API citation strings into a safe http(s) URL, or null if unusable.
+ * Many models return "www.example.com" without a scheme — browsers won't navigate those.
+ *
+ * @param {string | undefined | null} raw
+ * @returns {string | null}
+ */
+export function normalizeCitationHref(raw) {
+  if (raw == null) return null;
+  let s = String(raw).trim();
+  if (!s) return null;
+  if (/^javascript:/i.test(s) || /^data:/i.test(s)) return null;
+  if (!/^https?:\/\//i.test(s)) {
+    s = s.replace(/^\/\//, "");
+    s = `https://${s}`;
+  }
+  try {
+    const u = new URL(s);
+    if (u.protocol !== "http:" && u.protocol !== "https:") return null;
+    return u.href;
+  } catch {
+    return null;
+  }
+}
+
+/**
  * @param {string | undefined | null} url
  * @returns {TrustMeta}
  */

@@ -11,12 +11,12 @@ export function AuthShellView({ mode, onSwitchMode, children, footer }) {
   const { t } = useTranslation();
 
   return (
-    <main className="relative min-h-screen overflow-hidden bg-[#0b0d11] p-4 md:p-8">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_80%_50%_at_50%_-20%,rgba(52,211,153,0.08),transparent)]" />
-      <div className="pointer-events-none absolute bottom-0 right-0 h-64 w-64 rounded-full bg-emerald-500/5 blur-3xl" />
+    <main className="relative min-h-screen overflow-hidden bg-ink-900 p-4 md:p-8">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_75%_45%_at_50%_-15%,rgba(52,211,153,0.09),transparent_55%)]" />
+      <div className="pointer-events-none absolute bottom-0 right-0 h-72 w-72 rounded-full bg-emerald-500/[0.06] blur-3xl" />
 
       <div className="relative mx-auto flex min-h-[80vh] max-w-md flex-col justify-center">
-        <div className="rounded-3xl border border-white/[0.08] bg-white/[0.04] p-6 shadow-[0_24px_80px_rgba(0,0,0,0.45)] backdrop-blur-xl md:p-8">
+        <div className="rounded-[1.75rem] border border-white/[0.07] bg-white/[0.035] p-6 shadow-panel backdrop-blur-xl md:p-8">
           <header className="mb-6 space-y-1">
             <div className="flex items-center justify-between gap-3">
               <p className="text-xs uppercase tracking-[0.28em] text-amber-200/60">

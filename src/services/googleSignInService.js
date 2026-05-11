@@ -42,6 +42,9 @@ function loadGsi() {
 let _initializedClientId = null;
 const _pendingResolvers = [];
 
+/** Set before each `renderButton` call; receives JWT when user uses the Google button. */
+let _buttonCredentialHandler = /** @type {((credential: string) => void) | null} */ (null);
+
 function ensureInitialized(clientId) {
   return loadGsi().then((google) => {
     if (_initializedClientId === clientId) return google;
@@ -50,11 +53,16 @@ function ensureInitialized(clientId) {
       callback: (response) => {
         const token = response?.credential;
         const resolver = _pendingResolvers.shift();
-        if (!resolver) return;
-        if (!token) {
-          resolver.reject(new Error("Google sign-in returned no credential."));
-        } else {
-          resolver.resolve(token);
+        if (resolver) {
+          if (!token) {
+            resolver.reject(new Error("Google sign-in returned no credential."));
+          } else {
+            resolver.resolve(token);
+          }
+          return;
+        }
+        if (token && _buttonCredentialHandler) {
+          _buttonCredentialHandler(token);
         }
       },
       auto_select: false,
@@ -69,18 +77,24 @@ function ensureInitialized(clientId) {
  * Render a managed Google sign-in button into `host`.
  *
  * @param {HTMLElement} host
- * @param {{ clientId: string, theme?: 'outline'|'filled_blue'|'filled_black' }} opts
+ * @param {{ clientId: string, theme?: 'outline'|'filled_blue'|'filled_black', onCredential?: (jwt: string) => void }} opts
  * @returns {Promise<void>}
  */
-export async function renderGoogleSignInButton(host, { clientId, theme = "filled_blue" }) {
+export async function renderGoogleSignInButton(host, { clientId, theme = "outline", onCredential }) {
   if (!host) return;
+  _buttonCredentialHandler = typeof onCredential === "function" ? onCredential : null;
   const google = await ensureInitialized(clientId);
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  const w = host.getBoundingClientRect().width;
+  const width = Math.min(Math.max(Math.floor(w) || 320, 200), 400);
+  host.innerHTML = "";
   google.accounts.id.renderButton(host, {
     theme,
     size: "large",
-    shape: "pill",
+    shape: "rectangular",
     text: "continue_with",
-    width: host.clientWidth || 280,
+    width,
+    logo_alignment: "left",
   });
 }
 

@@ -62,25 +62,32 @@ export function useQuizViewModel(deps = {}) {
     (key) => {
       if (!currentQuestion) return;
       cancelPendingAdvance();
-      setAnswers((prev) => ({ ...prev, [currentQuestion.id]: key }));
+      const questionId = currentQuestion.id;
+      const wasLast = isLastQuestion;
+      const lastIdx = questions.length - 1;
+
+      setAnswers((prev) => ({ ...prev, [questionId]: key }));
+
+      const runAdvance = () => {
+        setAnswers((prev) => {
+          if (prev[questionId] !== key) return prev;
+          if (wasLast) {
+            setAssessment(buildAssessment(questions, prev, doshaMap));
+            setRoute("results");
+          } else {
+            setQuestionIndex((idx) => (idx === lastIdx ? idx : idx + 1));
+          }
+          return prev;
+        });
+      };
+
       if (autoAdvanceMs > 0) {
-        const questionId = currentQuestion.id;
-        const wasLast = isLastQuestion;
-        const lastIdx = questions.length - 1;
         advanceTimerRef.current = setTimeout(() => {
           advanceTimerRef.current = null;
-          setAnswers((prev) => {
-            // Bail out if the user changed their mind / went back before the timer fired.
-            if (prev[questionId] !== key) return prev;
-            if (wasLast) {
-              setAssessment(buildAssessment(questions, prev, doshaMap));
-              setRoute("results");
-            } else {
-              setQuestionIndex((idx) => (idx === lastIdx ? idx : idx + 1));
-            }
-            return prev;
-          });
+          runAdvance();
         }, autoAdvanceMs);
+      } else {
+        queueMicrotask(runAdvance);
       }
     },
     [

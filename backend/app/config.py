@@ -1,10 +1,19 @@
+from pathlib import Path
+
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+# Always load `backend/.env` regardless of process cwd (uvicorn started from repo root vs backend/).
+_BACKEND_DIR = Path(__file__).resolve().parents[1]
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_file=_BACKEND_DIR / ".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
-    database_url: str = "postgresql+psycopg2://holistica:holistica@localhost:5432/holistica_health"
+    database_url: str = "postgresql+psycopg2://holistica:holistica@127.0.0.1:5432/holistica_health"
 
     # Which provider implements the LLMGateway port. Supported: "gemini", "groq".
     llm_provider: str = "gemini"

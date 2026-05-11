@@ -15,6 +15,9 @@ dist/
 build/
 backend/.venv/
 
+# Local SQLite (dev)
+backend/*.db
+
 # Node / Vite
 node_modules/
 dist/

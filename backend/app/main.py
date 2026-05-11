@@ -6,6 +6,7 @@ itself contains no business rules and no persistence concerns — those live in
 """
 
 from contextlib import asynccontextmanager
+import logging
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +23,8 @@ from app.interfaces.http.routers import (
 )
 from app.scheduler import shutdown_scheduler, start_scheduler
 
+logger = logging.getLogger(__name__)
+
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
@@ -33,6 +36,24 @@ async def lifespan(_app: FastAPI):
 
 
 def create_app() -> FastAPI:
+    _prov = (settings.llm_provider or "gemini").strip().lower()
+    logger.info(
+        "LLM provider=%s (set LLM_PROVIDER in backend/.env; defaults to gemini if unset)",
+        _prov,
+    )
+    _gk = bool((settings.groq_api_key or "").strip())
+    _mk = bool((settings.gemini_api_key or "").strip())
+    if _prov == "groq" and not _gk:
+        logger.warning(
+            "GROQ_API_KEY is empty in backend/.env — /chat and /plan/generate will return 503 until "
+            "you add a key from https://console.groq.com/keys (check GET /health/llm: groq_key_set)."
+        )
+    elif _prov == "gemini" and not _mk:
+        logger.warning(
+            "GEMINI_API_KEY is empty in backend/.env — LLM routes will return 503 until set, "
+            "or switch to Groq (LLM_PROVIDER=groq + GROQ_API_KEY)."
+        )
+
     app = FastAPI(
         title="HolisticAI Health API",
         description="Backend for HolisticAI Health — non-diagnostic GenAI health assistant.",
@@ -61,6 +82,16 @@ def create_app() -> FastAPI:
     @app.get("/health")
     def _health() -> dict[str, str]:
         return {"status": "ok"}
+
+    @app.get("/health/llm")
+    def _health_llm() -> dict[str, str | bool]:
+        """Which LLM config the running process loaded (no secrets). Use to debug env issues."""
+        prov = (settings.llm_provider or "gemini").strip().lower()
+        return {
+            "llm_provider": prov,
+            "gemini_key_set": bool((settings.gemini_api_key or "").strip()),
+            "groq_key_set": bool((settings.groq_api_key or "").strip()),
+        }
 
     return app
 

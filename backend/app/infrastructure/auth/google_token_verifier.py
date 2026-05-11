@@ -7,9 +7,13 @@ app cannot be replayed.
 
 from __future__ import annotations
 
+import logging
+
 from app.application.ports.google_token_verifier import GoogleIdClaims
 from app.config import settings
 from app.domain.errors import AuthenticationError, ConfigurationError
+
+logger = logging.getLogger(__name__)
 
 
 class GoogleIdTokenVerifier:
@@ -37,6 +41,12 @@ class GoogleIdTokenVerifier:
             )
         except ValueError as exc:
             raise AuthenticationError("Google sign-in token is invalid.") from exc
+        except Exception as exc:  # google.auth.exceptions.GoogleAuthError, transport errors, etc.
+            logger.warning("Google ID token verification failed: %s", exc)
+            raise AuthenticationError(
+                "Google sign-in could not be verified. Ensure GOOGLE_CLIENT_ID in backend .env "
+                "matches VITE_GOOGLE_CLIENT_ID (same OAuth Web client ID)."
+            ) from exc
 
         sub = info.get("sub")
         if not isinstance(sub, str):

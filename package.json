@@ -8,7 +8,11 @@
     "build": "vite build",
     "preview": "vite preview --host",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "db:up": "cd backend && docker compose up -d",
+    "db:migrate": "bash -c 'cd backend || exit 1; if [ -x .venv/bin/python ]; then exec .venv/bin/python -m alembic upgrade head; else exec python3 -m alembic upgrade head; fi'",
+    "dev:api": "bash -c 'cd backend || exit 1; if [ -x .venv/bin/python ]; then exec .venv/bin/python -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000; else exec python3 -m uvicorn app.main:app --reload --host 127.0.0.1 --port 8000; fi'",
+    "dev:full": "concurrently -k -n web,api -c cyan,magenta \"npm run dev\" \"npm run dev:api\""
   },
   "dependencies": {
     "i18next": "^26.0.7",
@@ -27,6 +31,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^4.7.0",
     "autoprefixer": "^10.4.21",
+    "concurrently": "^9.2.1",
     "jsdom": "^29.0.2",
     "postcss": "^8.5.6",
     "tailwindcss": "^3.4.17",

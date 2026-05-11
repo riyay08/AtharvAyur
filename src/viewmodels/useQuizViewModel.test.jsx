@@ -27,23 +27,37 @@ function setup(overrides = {}) {
   return { ...hook, upsertProfile, onProfileSaved };
 }
 
+/** Flush queueMicrotask advances when autoAdvanceMs is 0 */
+async function afterSelectAnswer() {
+  await act(async () => {
+    await Promise.resolve();
+    await Promise.resolve();
+  });
+}
+
 describe("useQuizViewModel", () => {
-  it("walks through questions and transitions to results", () => {
+  it("walks through questions and transitions to results", async () => {
     const { result } = setup();
     expect(result.current.route).toBe("quiz");
     expect(result.current.progress).toBe(0);
 
-    act(() => result.current.selectAnswer("a"));
-    act(() => result.current.goNext());
+    await act(async () => {
+      result.current.selectAnswer("a");
+    });
+    await afterSelectAnswer();
     expect(result.current.questionIndex).toBe(1);
 
-    act(() => result.current.selectAnswer("b"));
-    act(() => result.current.goNext());
+    await act(async () => {
+      result.current.selectAnswer("b");
+    });
+    await afterSelectAnswer();
     expect(result.current.questionIndex).toBe(2);
     expect(result.current.isLastQuestion).toBe(true);
 
-    act(() => result.current.selectAnswer("a"));
-    act(() => result.current.goNext());
+    await act(async () => {
+      result.current.selectAnswer("a");
+    });
+    await afterSelectAnswer();
 
     expect(result.current.route).toBe("results");
     expect(result.current.assessment?.scores).toEqual({ vata: 2, pitta: 0, kapha: 1 });
@@ -59,12 +73,18 @@ describe("useQuizViewModel", () => {
 
   it("submitProfile calls the upserter and fires onProfileSaved on success", async () => {
     const { result, upsertProfile, onProfileSaved } = setup();
-    act(() => result.current.selectAnswer("a"));
-    act(() => result.current.goNext());
-    act(() => result.current.selectAnswer("a"));
-    act(() => result.current.goNext());
-    act(() => result.current.selectAnswer("a"));
-    act(() => result.current.goNext());
+    await act(async () => {
+      result.current.selectAnswer("a");
+    });
+    await afterSelectAnswer();
+    await act(async () => {
+      result.current.selectAnswer("a");
+    });
+    await afterSelectAnswer();
+    await act(async () => {
+      result.current.selectAnswer("a");
+    });
+    await afterSelectAnswer();
 
     await act(async () => {
       await result.current.submitProfile();
@@ -79,12 +99,18 @@ describe("useQuizViewModel", () => {
   it("submitProfile surfaces errors", async () => {
     const upsertProfile = vi.fn().mockRejectedValue(new Error("nope"));
     const { result } = setup({ upsertProfile });
-    act(() => result.current.selectAnswer("a"));
-    act(() => result.current.goNext());
-    act(() => result.current.selectAnswer("a"));
-    act(() => result.current.goNext());
-    act(() => result.current.selectAnswer("a"));
-    act(() => result.current.goNext());
+    await act(async () => {
+      result.current.selectAnswer("a");
+    });
+    await afterSelectAnswer();
+    await act(async () => {
+      result.current.selectAnswer("a");
+    });
+    await afterSelectAnswer();
+    await act(async () => {
+      result.current.selectAnswer("a");
+    });
+    await afterSelectAnswer();
 
     await act(async () => {
       await result.current.submitProfile();
@@ -93,10 +119,12 @@ describe("useQuizViewModel", () => {
     expect(result.current.submitError).toBe("nope");
   });
 
-  it("reset returns to the first question with no answers", () => {
+  it("reset returns to the first question with no answers", async () => {
     const { result } = setup();
-    act(() => result.current.selectAnswer("a"));
-    act(() => result.current.goNext());
+    await act(async () => {
+      result.current.selectAnswer("a");
+    });
+    await afterSelectAnswer();
     act(() => result.current.reset());
     expect(result.current.questionIndex).toBe(0);
     expect(result.current.answers).toEqual({});
@@ -160,7 +188,10 @@ describe("useQuizViewModel", () => {
     const onProfileSaved = vi.fn();
     const { result } = setup({ upsertProfile, onProfileSaved });
 
-    act(() => result.current.selectAnswer("a"));
+    await act(async () => {
+      result.current.selectAnswer("a");
+    });
+    await afterSelectAnswer();
     await act(async () => {
       await result.current.skipAssessment();
     });

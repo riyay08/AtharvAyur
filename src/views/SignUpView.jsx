@@ -1,9 +1,9 @@
-import { useEffect, useRef } from "react";
 import { Loader2, Mail, Phone, User as UserIcon, KeyRound } from "lucide-react";
 import { useTranslation } from "react-i18next";
 
-import { renderGoogleSignInButton } from "../services/googleSignInService.js";
+import { showAltMethodsDivider } from "../utils/googleSignInEnv.js";
 import { AuthTabsView } from "./AuthTabsView.jsx";
+import { GoogleSignInSection } from "./GoogleSignInSection.jsx";
 
 const FIELD =
   "w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-slate-50 placeholder:text-slate-500 outline-none transition focus:border-emerald-300/40 focus:bg-black/60";
@@ -14,31 +14,28 @@ const SECONDARY_BTN =
 
 export function SignUpView({ vm, googleClientId, onGoogleToken }) {
   const { t } = useTranslation();
-  const googleHostRef = useRef(/** @type {HTMLDivElement|null} */ (null));
-
-  useEffect(() => {
-    if (!googleClientId || !googleHostRef.current) return;
-    let cancelled = false;
-    const host = googleHostRef.current;
-    host.innerHTML = "";
-    const wrappedCallback = (id) => {
-      if (!cancelled) onGoogleToken?.(id);
-    };
-    window.__atharvayur_google_signup_cb = wrappedCallback;
-    renderGoogleSignInButton(host, { clientId: googleClientId }).catch(() => {});
-    return () => {
-      cancelled = true;
-      delete window.__atharvayur_google_signup_cb;
-    };
-  }, [googleClientId, onGoogleToken]);
 
   const tabs = [
     { id: "email", label: t("auth.tabs.email") },
     { id: "phone", label: t("auth.tabs.phone") },
   ];
 
+  const showGoogleOrDevHint = showAltMethodsDivider(googleClientId);
+
   return (
     <div>
+      <GoogleSignInSection googleClientId={googleClientId} onGoogleToken={onGoogleToken} />
+
+      {showGoogleOrDevHint ? (
+        <div className="mb-6 flex items-center gap-3 text-xs font-medium uppercase tracking-[0.2em] text-slate-500">
+          <span className="h-px flex-1 bg-white/10" />
+          <span className="max-w-[12rem] text-center normal-case leading-snug tracking-normal text-slate-400">
+            {t("auth.altMethodsSignup")}
+          </span>
+          <span className="h-px flex-1 bg-white/10" />
+        </div>
+      ) : null}
+
       <AuthTabsView tabs={tabs} activeId={vm.tab} onChange={vm.switchTab} />
 
       {vm.tab === "email" ? (
@@ -151,17 +148,6 @@ export function SignUpView({ vm, googleClientId, onGoogleToken }) {
               </button>
             </form>
           ) : null}
-        </div>
-      ) : null}
-
-      {googleClientId ? (
-        <div className="mt-5 space-y-2">
-          <div className="flex items-center gap-3 text-xs uppercase tracking-widest text-slate-500">
-            <span className="h-px flex-1 bg-white/10" />
-            <span>{t("common.or")}</span>
-            <span className="h-px flex-1 bg-white/10" />
-          </div>
-          <div ref={googleHostRef} className="flex justify-center" />
         </div>
       ) : null}
 

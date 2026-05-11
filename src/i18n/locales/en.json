@@ -21,7 +21,8 @@
     "displayName": "Display name",
     "optional": "(optional)",
     "errorGeneric": "Something went wrong.",
-    "retry": "Try again"
+    "retry": "Try again",
+    "loadingProfile": "Loading your profile… If this takes too long, refresh the page and make sure the API is running on port 8000."
   },
   "brand": {
     "appName": "AtharvAyur",
@@ -36,13 +37,16 @@
     "hasAccount": "Already have an account?",
     "switchToSignup": "Create an account",
     "switchToLogin": "Log in instead",
+    "altMethods": "Or use email, phone, or passkey",
+    "altMethodsSignup": "Or sign up with email or phone",
+    "googleDevHint": "Google sign-in is off until you set VITE_GOOGLE_CLIENT_ID in .env and restart the dev server.",
     "tabs": {
       "email": "Email",
       "phone": "Phone",
       "passkey": "Passkey"
     },
     "emailPlaceholder": "you@example.com",
-    "phonePlaceholder": "+14155551234",
+    "phonePlaceholder": "+919876543210",
     "passwordPlaceholder": "••••••••",
     "passwordHint": "At least 8 characters",
     "namePlaceholder": "Alex Patel",
@@ -87,9 +91,55 @@
   },
   "header": {
     "hubTitle": "Your wellness hub",
-    "hubSubtitle": "Daily check-in, your weekly Ayurvedic-inspired plan, and grounded chat — all tailored to your profile.",
+    "hubSubtitle": "Use the menu to open one thing at a time — calmer, clearer, and easier to focus.",
     "updateAssessment": "Update assessment",
     "security": "Security"
+  },
+  "hub": {
+    "navAria": "Wellness sections",
+    "menuLabel": "Menu",
+    "nav": {
+      "overview": "Overview",
+      "checkin": "Daily check-in",
+      "environment": "Daily tip",
+      "plan": "Weekly plan",
+      "chat": "Chat"
+    },
+    "overviewTitle": "Start here",
+    "overviewIntro": "Your tools live in the menu. Jump straight to check-in, today’s environment tip, your weekly plan, or the assistant — without scrolling through everything at once.",
+    "snapshotTitle": "Today’s snapshot",
+    "snapshotSubtitle": "Live status from your profile — dominant dosha, your latest ritual log, and today’s plan progress.",
+    "gotoTitle": "Jump to a section",
+    "openSection": "Open →",
+    "status": {
+      "loading": "Loading your snapshot…",
+      "loadError": "We couldn’t refresh your status. You can still open each section from the menu.",
+      "doshaTitle": "Dosha profile",
+      "doshaUnset": "No dosha profile saved yet.",
+      "doshaHint": "Finish the assessment to personalize guidance.",
+      "checkinTitle": "Daily ritual",
+      "checkinToday": "Logged today",
+      "checkinTodayHint": "Nice rhythm.",
+      "checkinPending": "No log for today yet.",
+      "checkinLast": "Last entry · {{date}}",
+      "checkinNone": "No check-ins recorded yet.",
+      "planTitle": "Weekly plan",
+      "planWeek": "Week of {{date}}",
+      "planProgress": "{{done}} / {{total}} tasks today",
+      "planNoTasksToday": "Plan is active — open it for today’s Mind · Fuel · Body focus.",
+      "planEmpty": "No plan for this week yet.",
+      "open": "Open section"
+    },
+    "shortcut": {
+      "checkinTitle": "Daily check-in",
+      "checkinBlurb": "Log sleep, digestion, energy, movement, and hydration for today.",
+      "tipTitle": "Daily tip",
+      "tipBlurb": "A grounded environment note tailored to your location when available.",
+      "planTitle": "Weekly plan",
+      "planBlurb": "Mind · Fuel · Body — Ayurvedic-inspired tasks for this week.",
+      "chatTitle": "Assistant chat",
+      "chatBlurb": "Ask general wellness questions — grounded search-backed replies when possible."
+    }
   },
   "checkin": {
     "label": "Daily ritual",
@@ -175,6 +225,8 @@
     "send": "Send",
     "placeholder": "Type a message…",
     "sources": "Sources",
+    "sourceLink": "Source",
+    "sourceLinkUnavailable": "link not available",
     "reason": "Reason: {{reason}}",
     "matched": "Matched: {{terms}}",
     "searchQueries": "Search queries: {{queries}}",

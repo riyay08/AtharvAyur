@@ -170,7 +170,10 @@ class GeminiLLMGateway:
     ) -> None:
         key = (api_key or settings.gemini_api_key or "").strip()
         if not key:
-            raise ConfigurationError("GEMINI_API_KEY is not set.")
+            raise ConfigurationError(
+                "GEMINI_API_KEY is not set. Add GEMINI_API_KEY to backend/.env, or use Groq: "
+                "set LLM_PROVIDER=groq and GROQ_API_KEY there, then restart the API."
+            )
         self._client = genai.Client(api_key=key)
         self._model = model or settings.gemini_model
         self._embed_model = embedding_model or settings.gemini_embedding_model

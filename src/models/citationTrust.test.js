@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { citationTrustMeta } from "./citationTrust.js";
+import { citationTrustMeta, normalizeCitationHref } from "./citationTrust.js";
 
 describe("citationTrustMeta", () => {
   it("tags .gov and .edu hosts as high trust", () => {
@@ -13,5 +13,24 @@ describe("citationTrustMeta", () => {
     expect(citationTrustMeta("not a url").tier).toBe("institutional");
     expect(citationTrustMeta("").tier).toBe("institutional");
     expect(citationTrustMeta(null).tier).toBe("institutional");
+  });
+});
+
+describe("normalizeCitationHref", () => {
+  it("adds https for bare hostnames", () => {
+    expect(normalizeCitationHref("www.nih.gov/path")).toBe("https://www.nih.gov/path");
+    expect(normalizeCitationHref("example.com")).toBe("https://example.com/");
+  });
+
+  it("preserves existing schemes", () => {
+    expect(normalizeCitationHref("http://a.org/x")).toBe("http://a.org/x");
+    expect(normalizeCitationHref("https://b.org/y")).toBe("https://b.org/y");
+  });
+
+  it("returns null for empty or dangerous values", () => {
+    expect(normalizeCitationHref("")).toBeNull();
+    expect(normalizeCitationHref(null)).toBeNull();
+    expect(normalizeCitationHref("javascript:alert(1)")).toBeNull();
+    expect(normalizeCitationHref("data:text/html,hi")).toBeNull();
   });
 });

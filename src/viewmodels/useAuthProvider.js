@@ -29,6 +29,8 @@ import {
   setStoredAuthUser,
 } from "../services/storage.js";
 
+const PROFILE_CHECK_TIMEOUT_MS = 15_000;
+
 function meResponseToAuthUser(me) {
   if (!me) return null;
   return {
@@ -49,7 +51,8 @@ export function useAuthProvider() {
   const [loadingMe, setLoadingMe] = useState(false);
   const [hasProfile, setHasProfile] = useState(false);
   const [profileChecked, setProfileChecked] = useState(false);
-  const profileCheckInFlightRef = useRef(false);
+  /** Reuse one in-flight profile check so concurrent callers all await the same work. */
+  const profileCheckPromiseRef = useRef(/** @type {Promise<void> | null} */ (null));
 
   const checkProfile = useCallback(async () => {
     if (!getStoredAccessToken()) {
@@ -57,19 +60,28 @@ export function useAuthProvider() {
       setProfileChecked(true);
       return;
     }
-    if (profileCheckInFlightRef.current) return;
-    profileCheckInFlightRef.current = true;
-    try {
-      const present = await hasHealthProfile();
-      setHasProfile(present);
-    } catch {
-      // Network/auth blip — treat as "unknown" but resolved so we don't
-      // block the UI. The user can manually retake the quiz.
-      setHasProfile(false);
-    } finally {
-      profileCheckInFlightRef.current = false;
-      setProfileChecked(true);
+    if (profileCheckPromiseRef.current) {
+      await profileCheckPromiseRef.current;
+      return;
     }
+    profileCheckPromiseRef.current = (async () => {
+      try {
+        const present = await Promise.race([
+          hasHealthProfile(),
+          new Promise((_, reject) => {
+            setTimeout(() => reject(new Error("profile_check_timeout")), PROFILE_CHECK_TIMEOUT_MS);
+          }),
+        ]);
+        setHasProfile(/** @type {boolean} */ (present));
+      } catch {
+        // Timeout, network, or auth blip — unblock UI; user can complete or retake quiz.
+        setHasProfile(false);
+      } finally {
+        setProfileChecked(true);
+        profileCheckPromiseRef.current = null;
+      }
+    })();
+    await profileCheckPromiseRef.current;
   }, []);
 
   const refreshMe = useCallback(async () => {

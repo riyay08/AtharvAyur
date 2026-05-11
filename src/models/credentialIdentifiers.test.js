@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   isLikelyE164Phone,
@@ -20,11 +20,43 @@ describe("credentialIdentifiers", () => {
   });
 
   it("normalizes phone numbers into E.164", () => {
+    vi.stubEnv("VITE_PHONE_DEFAULT_COUNTRY_CODE", "none");
+
     expect(normalizePhone("+1 (415) 555-1234")).toBe("+14155551234");
     expect(normalizePhone("4155551234")).toBe("+4155551234");
     expect(normalizePhone("invalid")).toBe("");
     expect(isLikelyE164Phone("+14155551234")).toBe(true);
     expect(isLikelyE164Phone("123")).toBe(false);
+
+    vi.unstubAllEnvs();
+  });
+
+  it("defaults Indian mobiles without country code to +91 when country code env is unset", () => {
+    vi.stubEnv("VITE_PHONE_DEFAULT_COUNTRY_CODE", "");
+
+    expect(normalizePhone("9876543210")).toBe("+919876543210");
+    expect(normalizePhone("09876543210")).toBe("+919876543210");
+    expect(normalizePhone("919876543210")).toBe("+919876543210");
+    expect(normalizePhone("+919876543210")).toBe("+919876543210");
+
+    vi.unstubAllEnvs();
+  });
+
+  it("rejects ambiguous 10-digit Indian-looking numbers when localized rules are disabled", () => {
+    vi.stubEnv("VITE_PHONE_DEFAULT_COUNTRY_CODE", "none");
+
+    expect(normalizePhone("9876543210")).toBe("");
+    expect(isLikelyE164Phone("9876543210")).toBe(false);
+
+    vi.unstubAllEnvs();
+  });
+
+  it("normalizes US 10-digit numbers when default country is 1", () => {
+    vi.stubEnv("VITE_PHONE_DEFAULT_COUNTRY_CODE", "1");
+
+    expect(normalizePhone("4155551234")).toBe("+14155551234");
+
+    vi.unstubAllEnvs();
   });
 
   it("enforces password length minimum", () => {
