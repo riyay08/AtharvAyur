@@ -16,7 +16,7 @@ concurrency:
 
 jobs:
   frontend:
-    name: Build & deploy frontend (S3 + CloudFront)
+    name: Build & deploy frontend (S3 + optional CloudFront)
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -69,12 +69,14 @@ jobs:
           done
 
       - name: Invalidate CloudFront (frontend)
+        if: ${{ vars.CLOUDFRONT_FRONTEND_ID != '' }}
         run: |
           aws cloudfront create-invalidation \
             --distribution-id "${{ vars.CLOUDFRONT_FRONTEND_ID }}" \
             --paths "/index.html" "/"
 
   backend:
+    if: ${{ vars.EC2_HOST != '' }}
     name: Deploy backend (SSH to EC2)
     runs-on: ubuntu-latest
     steps:

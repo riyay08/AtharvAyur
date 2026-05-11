@@ -1,0 +1,17 @@
+# Copy to terraform.tfvars (do not commit — add terraform.tfvars to .gitignore below)
+#   cp terraform.tfvars.example terraform.tfvars
+
+aws_region               = "us-east-2"
+existing_s3_bucket_name  = "atharvayur"
+ec2_key_name             = "my-keypair-name-us-east-2"
+
+# Optional: tighten SSH to your IP: "203.0.113.10/32"
+# admin_ssh_cidr = "0.0.0.0/0"
+
+# Must match repository under GitHub Actions
+# github_org  = "riyay08"
+# github_repo = "AtharvAyur"
+
+# Set false only if Terraform errors: "duplicate OIDC provider" (already exists).
+# Then import: terraform import 'aws_iam_openid_connect_provider.github[0]' arn:aws:iam::YOUR_ACCOUNT_ID:oidc-provider/token.actions.githubusercontent.com
+# create_github_oidc_provider = false
