@@ -43,7 +43,7 @@ class User(Base):
         String(32), nullable=False, default="anonymous"
     )
     last_login_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
-
+   
     health_profile: Mapped[HealthProfile | None] = relationship(
         back_populates="user",
         uselist=False,
