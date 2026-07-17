@@ -14,6 +14,10 @@ sqlalchemy>=2.0.0
 alembic>=1.13.0
 psycopg2-binary>=2.9.0
 pgvector>=0.3.6
+# Async driver — v2.0 modules only (Conversation/SessionSummary/orchestrator); legacy
+# repositories keep using psycopg2-binary above via the sync engine.
+asyncpg>=0.29.0
+greenlet>=3.0.0
 
 # GenAI (Steps 3–4)
 google-genai>=1.0.0

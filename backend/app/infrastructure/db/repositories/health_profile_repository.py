@@ -16,6 +16,9 @@ def _to_entity(row: HealthProfileORM) -> HealthProfileEntity:
         conditions=row.conditions,
         allergies=row.allergies,
         medications=row.medications,
+        vata_score=row.vata_score,
+        pitta_score=row.pitta_score,
+        kapha_score=row.kapha_score,
     )
 
 
@@ -37,6 +40,9 @@ class SqlAlchemyHealthProfileRepository:
             existing.conditions = profile.conditions
             existing.allergies = profile.allergies
             existing.medications = profile.medications
+            existing.vata_score = profile.vata_score
+            existing.pitta_score = profile.pitta_score
+            existing.kapha_score = profile.kapha_score
             self._s.flush()
             return _to_entity(existing)
         row = HealthProfileORM(
@@ -45,6 +51,9 @@ class SqlAlchemyHealthProfileRepository:
             conditions=profile.conditions,
             allergies=profile.allergies,
             medications=profile.medications,
+            vata_score=profile.vata_score,
+            pitta_score=profile.pitta_score,
+            kapha_score=profile.kapha_score,
         )
         self._s.add(row)
         self._s.flush()

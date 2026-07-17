@@ -17,3 +17,4 @@ class ChatMessage:
     message: str
     timestamp: datetime | None = None
     embedding: list[float] | None = None
+    conversation_id: uuid.UUID | None = None

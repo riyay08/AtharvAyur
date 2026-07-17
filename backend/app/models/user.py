@@ -12,9 +12,11 @@ from app.database import Base
 
 if TYPE_CHECKING:
     from app.models.chat_history import ChatHistory
+    from app.models.conversation import Conversation
     from app.models.daily_check_in import DailyCheckIn
     from app.models.daily_environment_tip import DailyEnvironmentTip
     from app.models.health_profile import HealthProfile
+    from app.models.user_memory import UserMemory
     from app.models.webauthn_credential import WebAuthnCredential
     from app.models.weekly_plan import WeeklyPlan
 
@@ -53,6 +55,10 @@ class User(Base):
         back_populates="user",
         cascade="all, delete-orphan",
     )
+    conversations: Mapped[list[Conversation]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
     daily_check_ins: Mapped[list[DailyCheckIn]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
@@ -66,6 +72,10 @@ class User(Base):
         cascade="all, delete-orphan",
     )
     webauthn_credentials: Mapped[list[WebAuthnCredential]] = relationship(
+        back_populates="user",
+        cascade="all, delete-orphan",
+    )
+    user_memories: Mapped[list[UserMemory]] = relationship(
         back_populates="user",
         cascade="all, delete-orphan",
     )

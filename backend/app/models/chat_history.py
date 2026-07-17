@@ -13,6 +13,7 @@ from pgvector.sqlalchemy import Vector
 from app.database import Base
 
 if TYPE_CHECKING:
+    from app.models.conversation import Conversation
     from app.models.user import User
 
 
@@ -35,6 +36,12 @@ class ChatHistory(Base):
         nullable=False,
         index=True,
     )
+    conversation_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True),
+        ForeignKey("conversations.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     role: Mapped[ChatRole] = mapped_column(
         SAEnum(ChatRole, native_enum=False, values_callable=lambda m: [e.value for e in m]),
         nullable=False,
@@ -49,3 +56,4 @@ class ChatHistory(Base):
     )
 
     user: Mapped[User] = relationship(back_populates="chat_messages")
+    conversation: Mapped[Conversation | None] = relationship(back_populates="messages")

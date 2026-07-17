@@ -12,11 +12,14 @@ from typing import Protocol, Sequence
 
 from app.domain.entities import (
     ChatMessage,
+    Conversation,
     DailyCheckIn,
     DailyEnvironmentTip,
     HealthProfile,
     PhoneOtp,
+    SessionSummary,
     User,
+    UserMemory,
     WebAuthnCredential,
     WeeklyPlan,
 )
@@ -64,6 +67,14 @@ class ChatRepository(Protocol):
         days: int = 7,
         limit: int = 5,
     ) -> list[ChatMessage]: ...
+    def list_for_conversation(self, conversation_id: uuid.UUID) -> list[ChatMessage]:
+        """All messages (both roles) tagged with this conversation, oldest first.
+
+        Still a sync method on the legacy `chat_history` table/engine — the
+        Orchestrator calls this directly from its async `observe()`, matching the
+        hybrid-async strategy (only the new Conversation/SessionSummary repos are
+        async)."""
+        ...
 
 
 class CheckInRepository(Protocol):
@@ -93,3 +104,50 @@ class EnvironmentTipRepository(Protocol):
 
 class AuditLogRepository(Protocol):
     def record(self, actor: str, action: str) -> None: ...
+
+
+# ---------- Async ports (v2.0 modules only — see app/database.py hybrid engine note) ----------
+
+
+class ConversationRepository(Protocol):
+    """Async port. Backed by `get_async_db()`, not the legacy sync session."""
+
+    async def add(self, conversation: Conversation) -> Conversation: ...
+    async def get_by_id(self, conversation_id: uuid.UUID) -> Conversation | None: ...
+    async def update(self, conversation: Conversation) -> Conversation: ...
+
+
+class SessionSummaryRepository(Protocol):
+    """Async port. Backed by `get_async_db()`, not the legacy sync session."""
+
+    async def add(self, summary: SessionSummary) -> SessionSummary: ...
+    async def list_for_conversation(
+        self, conversation_id: uuid.UUID
+    ) -> list[SessionSummary]: ...
+    async def list_recent_for_user(
+        self, user_id: uuid.UUID, limit: int = 3
+    ) -> list[SessionSummary]: ...
+
+
+class UserMemoryRepository(Protocol):
+    """Async port. Backed by `get_async_db()`, not the legacy sync session.
+
+    Long-Term Memory (LTM) facts — durable, declarative statements about a
+    user (e.g. "User is lactose intolerant"), as opposed to `SessionSummary`'s
+    per-conversation recap or `ChatMessage`'s raw transcript."""
+
+    async def add_fact(
+        self,
+        *,
+        user_id: uuid.UUID,
+        fact_text: str,
+        embedding: list[float] | None,
+        source: str | None,
+    ) -> UserMemory: ...
+
+    async def search_relevant_facts(
+        self,
+        user_id: uuid.UUID,
+        query_embedding: list[float],
+        limit: int = 3,
+    ) -> list[UserMemory]: ...

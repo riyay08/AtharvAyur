@@ -16,6 +16,9 @@ class HealthProfile:
     conditions: dict[str, Any] | list[Any] | None = None
     allergies: dict[str, Any] | list[Any] | None = None
     medications: dict[str, Any] | list[Any] | None = None
+    vata_score: int | None = None
+    pitta_score: int | None = None
+    kapha_score: int | None = None
 
     @property
     def prakriti(self) -> dict[str, Any] | None:

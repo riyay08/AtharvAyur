@@ -5,7 +5,7 @@ import uuid
 from datetime import date, datetime
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Date, DateTime, Enum as SAEnum, ForeignKey, Integer, String, UniqueConstraint, func
+from sqlalchemy import Date, DateTime, Enum as SAEnum, ForeignKey, Integer, String, Text, UniqueConstraint, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -72,6 +72,8 @@ class DailyCheckIn(Base):
         nullable=False,
     )
     water_glasses: Mapped[int] = mapped_column(Integer(), nullable=False)
+    mood_score: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text(), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         server_default=func.now(),

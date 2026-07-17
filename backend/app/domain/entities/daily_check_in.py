@@ -43,7 +43,11 @@ class DailyCheckIn:
     movement: MovementLevel
     water_glasses: int
     timestamp: datetime | None = None
+    mood_score: int | None = None
+    notes: str | None = None
 
     def __post_init__(self) -> None:
         if self.water_glasses < 0:
             raise ValueError("water_glasses cannot be negative")
+        if self.mood_score is not None and not (1 <= self.mood_score <= 5):
+            raise ValueError("mood_score must be between 1 and 5")

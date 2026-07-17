@@ -63,6 +63,10 @@ class UpsertCheckIn:
             movement=move,
             water_glasses=cmd.water_glasses,
             timestamp=existing.timestamp if existing else None,
+            # `mood_score`/`notes` aren't on this command yet (v1 endpoint) — preserve
+            # whatever's already stored rather than silently nulling it on every edit.
+            mood_score=existing.mood_score if existing else None,
+            notes=existing.notes if existing else None,
         )
         saved = self.check_ins.upsert(check_in)
         self.audit.record(actor=str(cmd.user_id), action="checkin.upserted")

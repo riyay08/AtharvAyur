@@ -38,6 +38,8 @@ def _to_entity(row: CheckInORM) -> CheckInEntity:
         movement=MovementLevel(row.movement.value),
         water_glasses=row.water_glasses,
         timestamp=row.timestamp,
+        mood_score=row.mood_score,
+        notes=row.notes,
     )
 
 
@@ -85,6 +87,8 @@ class SqlAlchemyCheckInRepository:
             existing.energy_state = OrmEnergyState(check_in.energy_state.value)
             existing.movement = OrmMovementLevel(check_in.movement.value)
             existing.water_glasses = check_in.water_glasses
+            existing.mood_score = check_in.mood_score
+            existing.notes = check_in.notes
             self._s.flush()
             return _to_entity(existing)
         row = CheckInORM(
@@ -96,6 +100,8 @@ class SqlAlchemyCheckInRepository:
             energy_state=OrmEnergyState(check_in.energy_state.value),
             movement=OrmMovementLevel(check_in.movement.value),
             water_glasses=check_in.water_glasses,
+            mood_score=check_in.mood_score,
+            notes=check_in.notes,
         )
         self._s.add(row)
         self._s.flush()

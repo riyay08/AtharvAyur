@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from sqlalchemy import desc, select
+from sqlalchemy import asc, desc, select
 from sqlalchemy.orm import Session
 
 from app.domain.entities import ChatMessage
@@ -24,6 +24,7 @@ def _to_entity(row: ChatHistoryORM) -> ChatMessage:
         message=row.message,
         timestamp=row.timestamp,
         embedding=list(row.embedding) if row.embedding is not None else None,
+        conversation_id=row.conversation_id,
     )
 
 
@@ -35,6 +36,7 @@ class SqlAlchemyChatRepository:
         row = ChatHistoryORM(
             id=message.id,
             user_id=message.user_id,
+            conversation_id=message.conversation_id,
             role=_role_to_orm(message.role),
             message=message.message,
             embedding=message.embedding,
@@ -59,6 +61,15 @@ class SqlAlchemyChatRepository:
         )
         rows = list(self._s.execute(stmt).scalars().all())
         return [_to_entity(r) for r in reversed(rows)]
+
+    def list_for_conversation(self, conversation_id: uuid.UUID) -> list[ChatMessage]:
+        stmt = (
+            select(ChatHistoryORM)
+            .where(ChatHistoryORM.conversation_id == conversation_id)
+            .order_by(asc(ChatHistoryORM.timestamp))
+        )
+        rows = list(self._s.execute(stmt).scalars().all())
+        return [_to_entity(r) for r in rows]
 
     def list_semantic_user_messages(
         self,

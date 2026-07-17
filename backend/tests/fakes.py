@@ -20,11 +20,14 @@ from app.application.ports.webauthn_service import (
 )
 from app.domain.entities import (
     ChatMessage,
+    Conversation,
     DailyCheckIn,
     DailyEnvironmentTip,
     HealthProfile,
     PhoneOtp,
+    SessionSummary,
     User,
+    UserMemory,
     WebAuthnCredential,
     WeeklyPlan,
 )
@@ -60,6 +63,20 @@ class FakeUnitOfWork:
         self.commits += 1
 
     def rollback(self) -> None:
+        self.rollbacks += 1
+
+
+class FakeAsyncUnitOfWork:
+    """Async counterpart of `FakeUnitOfWork` — matches `AsyncUnitOfWork`."""
+
+    def __init__(self) -> None:
+        self.commits = 0
+        self.rollbacks = 0
+
+    async def commit(self) -> None:
+        self.commits += 1
+
+    async def rollback(self) -> None:
         self.rollbacks += 1
 
 
@@ -139,6 +156,12 @@ class FakeChatRepository:
         limit: int = 5,
     ) -> list[ChatMessage]:
         return []
+
+    def list_for_conversation(self, conversation_id: uuid.UUID) -> list[ChatMessage]:
+        return sorted(
+            (m for m in self.messages if m.conversation_id == conversation_id),
+            key=lambda m: m.timestamp or datetime.min.replace(tzinfo=timezone.utc),
+        )
 
 
 class FakeCheckInRepository:
@@ -296,6 +319,151 @@ class FakeLLMGateway:
     ) -> str:
         self.calls.append("generate_environment_tip_json")
         return self._daily_tip_json
+
+    def generate_session_summary(self, *, transcript: str) -> str:
+        self.calls.append("generate_session_summary")
+        self.last_transcript = transcript
+        return self._session_summary
+
+    def extract_long_term_facts(self, *, transcript: str) -> tuple[str, ...]:
+        self.calls.append("extract_long_term_facts")
+        self.last_facts_transcript = transcript
+        return self._long_term_facts
+
+
+class FakeConversationRepository:
+    """Async fake — matches the real `ConversationRepository` port (async methods)."""
+
+    def __init__(self, conversations: list[Conversation] | None = None) -> None:
+        self._by_id: dict[uuid.UUID, Conversation] = {c.id: c for c in (conversations or [])}
+
+    async def add(self, conversation: Conversation) -> Conversation:
+        self._by_id[conversation.id] = conversation
+        return conversation
+
+    async def get_by_id(self, conversation_id: uuid.UUID) -> Conversation | None:
+        return self._by_id.get(conversation_id)
+
+    async def update(self, conversation: Conversation) -> Conversation:
+        if conversation.id not in self._by_id:
+            raise KeyError(f"Conversation {conversation.id} not found")
+        self._by_id[conversation.id] = conversation
+        return conversation
+
+
+class FakeSessionSummaryRepository:
+    """Async fake — matches the real `SessionSummaryRepository` port (async methods)."""
+
+    def __init__(self, summaries: list[SessionSummary] | None = None) -> None:
+        self.summaries: list[SessionSummary] = list(summaries or [])
+
+    async def add(self, summary: SessionSummary) -> SessionSummary:
+        self.summaries.append(summary)
+        return summary
+
+    async def list_for_conversation(self, conversation_id: uuid.UUID) -> list[SessionSummary]:
+        return [s for s in self.summaries if s.conversation_id == conversation_id]
+
+    async def list_recent_for_user(
+        self, user_id: uuid.UUID, limit: int = 3
+    ) -> list[SessionSummary]:
+        # Real repo joins through `conversations.user_id`; this fake is seeded
+        # directly with the summaries a test wants visible, newest-first.
+        return list(reversed(self.summaries))[:limit]
+
+
+class FakeUserMemoryRepository:
+    """Async fake — matches the real `UserMemoryRepository` port (async methods)."""
+
+    def __init__(self, facts: list[UserMemory] | None = None) -> None:
+        self.facts: list[UserMemory] = list(facts or [])
+
+    async def add_fact(
+        self,
+        *,
+        user_id: uuid.UUID,
+        fact_text: str,
+        embedding: list[float] | None,
+        source: str | None,
+    ) -> UserMemory:
+        fact = UserMemory(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            fact_text=fact_text,
+            embedding=embedding,
+            source=source,
+        )
+        self.facts.append(fact)
+        return fact
+
+    async def search_relevant_facts(
+        self, user_id: uuid.UUID, query_embedding: list[float], limit: int = 3
+    ) -> list[UserMemory]:
+        if not query_embedding:
+            return []
+        return [f for f in self.facts if f.user_id == user_id][:limit]
+
+
+class FakeOrchestrator:
+    """Deterministic Orchestrator double: canned Observe/Act/Replan outputs.
+
+    Override the constructor args to script specific scenarios (e.g. a draft
+    reply that Replan should rewrite). `.calls` records phase names in order so
+    tests can assert the OAR loop ran (and in what order).
+    """
+
+    def __init__(
+        self,
+        *,
+        session_summaries: tuple[SessionSummary, ...] = (),
+        conversation_history_block: str = "",
+        embedding: list[float] | None = None,
+        draft_reply: GroundedReply | None = None,
+        final_reply: GroundedReply | None = None,
+        raise_not_found: bool = False,
+    ) -> None:
+        self.session_summaries = session_summaries
+        self.conversation_history_block = conversation_history_block
+        self.embedding = embedding
+        self._draft_reply = draft_reply or GroundedReply(reply_text="Draft reply.")
+        self._final_reply = final_reply or self._draft_reply
+        self.raise_not_found = raise_not_found
+        self.calls: list[str] = []
+        self.observed_contexts: list[ObservedContext] = []
+
+    async def observe(
+        self,
+        *,
+        user_id: uuid.UUID,
+        conversation_id: uuid.UUID | None,
+        user_message: str,
+    ) -> ObservedContext:
+        self.calls.append("observe")
+        if self.raise_not_found:
+            from app.domain.errors import NotFoundError
+
+            raise NotFoundError(f"Conversation {conversation_id} not found for this user.")
+        context = ObservedContext(
+            user_id=user_id,
+            conversation_id=conversation_id,
+            user_message=user_message,
+            profile_blob_json="{}",
+            recent_history_block="",
+            semantic_history_block="",
+            conversation_history_block=self.conversation_history_block,
+            session_summaries=self.session_summaries,
+            embedding=self.embedding,
+        )
+        self.observed_contexts.append(context)
+        return context
+
+    def act(self, context: ObservedContext) -> GroundedReply:
+        self.calls.append("act")
+        return self._draft_reply
+
+    def replan(self, context: ObservedContext, draft: GroundedReply) -> GroundedReply:
+        self.calls.append("replan")
+        return self._final_reply
 
 
 class FakeWeatherGateway:

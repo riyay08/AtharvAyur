@@ -23,6 +23,7 @@ from app.application.ports.repositories import (
 from app.application.ports.unit_of_work import UnitOfWork
 from app.domain.entities import HealthProfile
 from app.domain.errors import NotFoundError
+from app.domain.services.dosha_scoring import DoshaScores, extract_dosha_scores
 from app.domain.services.profile_merge import merge_prakriti_into_conditions
 from app.domain.services.week_calendar import week_start_monday
 
@@ -58,6 +59,12 @@ class UpsertProfile:
             else (existing.medications if existing else None)
         )
 
+        existing_scores = DoshaScores(
+            vata=existing.vata_score if existing else None,
+            pitta=existing.pitta_score if existing else None,
+            kapha=existing.kapha_score if existing else None,
+        )
+
         if cmd.prakriti_payload is not None:
             base = (
                 cmd.conditions
@@ -65,10 +72,15 @@ class UpsertProfile:
                 else (existing.conditions if existing else None)
             )
             new_conditions = merge_prakriti_into_conditions(base, cmd.prakriti_payload)
+            # A new quiz submission re-derives the structured scores; anything else
+            # (editing allergies/medications, etc.) must NOT touch them.
+            dosha_scores = extract_dosha_scores(cmd.prakriti_payload)
         elif not UpsertProfileInput.is_unset(cmd.conditions):
             new_conditions = cmd.conditions
+            dosha_scores = existing_scores
         else:
             new_conditions = existing.conditions if existing else None
+            dosha_scores = existing_scores
 
         profile = HealthProfile(
             id=existing.id if existing else uuid.uuid4(),
@@ -76,6 +88,9 @@ class UpsertProfile:
             conditions=new_conditions,
             allergies=new_allergies,
             medications=new_medications,
+            vata_score=dosha_scores.vata,
+            pitta_score=dosha_scores.pitta,
+            kapha_score=dosha_scores.kapha,
         )
         saved = self.profiles.upsert(profile)
         self.audit.record(actor=str(cmd.user_id), action="profile.upserted")

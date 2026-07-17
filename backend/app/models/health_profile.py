@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from typing import TYPE_CHECKING
 
-from sqlalchemy import ForeignKey, JSON, UniqueConstraint
+from sqlalchemy import ForeignKey, Integer, JSON, UniqueConstraint
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -31,5 +31,11 @@ class HealthProfile(Base):
     conditions: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
     allergies: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
     medications: Mapped[dict | list | None] = mapped_column(JSON, nullable=True)
+    # Structured cache of `conditions.prakriti_quiz.dosha_distribution` (raw per-answer
+    # counts from the onboarding quiz). The JSON blob remains the source of truth;
+    # these columns exist so the score can be queried/sorted without JSON path parsing.
+    vata_score: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    pitta_score: Mapped[int | None] = mapped_column(Integer(), nullable=True)
+    kapha_score: Mapped[int | None] = mapped_column(Integer(), nullable=True)
 
     user: Mapped[User] = relationship(back_populates="health_profile")
