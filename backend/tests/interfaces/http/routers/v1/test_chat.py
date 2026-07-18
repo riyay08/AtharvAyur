@@ -19,6 +19,7 @@ from tests.fakes import (
     FakeAsyncUnitOfWork,
     FakeAuditLogRepository,
     FakeChatRepository,
+    FakeCheckInRepository,
     FakeConversationRepository,
     FakeHealthProfileRepository,
     FakeLLMGateway,
@@ -44,6 +45,7 @@ def _client(
     orchestrator = ChatOrchestrator(
         profiles=profiles,
         chat_repo=chat_repo,
+        check_ins=FakeCheckInRepository(),
         conversations=conversation_repo,
         summaries=FakeSessionSummaryRepository(),
         user_memories=FakeUserMemoryRepository(),

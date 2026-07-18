@@ -10,6 +10,7 @@ from app.domain.errors import NotFoundError
 from app.domain.value_objects import ChatRole
 from tests.fakes import (
     FakeChatRepository,
+    FakeCheckInRepository,
     FakeConversationRepository,
     FakeHealthProfileRepository,
     FakeLLMGateway,
@@ -22,6 +23,7 @@ def _make_orchestrator(**kwargs) -> ChatOrchestrator:
     return ChatOrchestrator(
         profiles=kwargs.pop("profiles", FakeHealthProfileRepository()),
         chat_repo=kwargs.pop("chat_repo", FakeChatRepository()),
+        check_ins=kwargs.pop("check_ins", FakeCheckInRepository()),
         conversations=kwargs.pop("conversations", FakeConversationRepository()),
         summaries=kwargs.pop("summaries", FakeSessionSummaryRepository()),
         user_memories=kwargs.pop("user_memories", FakeUserMemoryRepository()),
@@ -159,6 +161,46 @@ async def test_observe_skips_user_memories_when_embedding_unavailable() -> None:
     assert ctx.known_user_facts_block == ""
 
 
+@pytest.mark.asyncio
+async def test_observe_loads_todays_daily_checkin_block() -> None:
+    from datetime import date
+
+    from app.domain.entities import DailyCheckIn, Digestion, EnergyState, MovementLevel, SleepQuality
+
+    user_id = uuid.uuid4()
+    today = date.today()
+    check_ins = FakeCheckInRepository()
+    check_ins.upsert(
+        DailyCheckIn(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            check_in_date=today,
+            sleep_quality=SleepQuality.RESTLESS,
+            digestion=Digestion.BLOATED,
+            energy_state=EnergyState.SLUGGISH,
+            movement=MovementLevel.REST,
+            water_glasses=3,
+        )
+    )
+    orch = _make_orchestrator(check_ins=check_ins)
+
+    ctx = await orch.observe(user_id=user_id, conversation_id=None, user_message="Why am I tired?")
+
+    assert "Today's Daily Check-in:" in ctx.daily_checkin_block
+    assert "restless" in ctx.daily_checkin_block
+    assert "sluggish" in ctx.daily_checkin_block
+    assert "3 glasses of water" in ctx.daily_checkin_block
+
+
+@pytest.mark.asyncio
+async def test_observe_daily_checkin_block_empty_when_no_log_for_today() -> None:
+    orch = _make_orchestrator()
+
+    ctx = await orch.observe(user_id=uuid.uuid4(), conversation_id=None, user_message="Any tips?")
+
+    assert ctx.daily_checkin_block == ""
+
+
 def test_act_calls_llm_gateway_and_folds_context_in_injection_order() -> None:
     from app.application.ports.orchestrator import ObservedContext
 
@@ -175,6 +217,15 @@ def test_act_calls_llm_gateway_and_folds_context_in_injection_order() -> None:
         conversation_history_block="user: hi\nassistant: hello",
         session_summaries=(summary,),
         known_user_facts_block="Known User Facts:\n- User is lactose intolerant.",
+        daily_checkin_block=(
+            "Today's Daily Check-in:\n"
+            "- Date: 2026-07-17\n"
+            "- Sleep quality: restless\n"
+            "- Energy state: sluggish\n"
+            "- Digestion: bloated\n"
+            "- Movement: rest\n"
+            "- Hydration: 2 glasses of water"
+        ),
     )
 
     reply = orch.act(context)
@@ -183,11 +234,13 @@ def test_act_calls_llm_gateway_and_folds_context_in_injection_order() -> None:
     assert "generate_health_reply" in llm.calls
     assert llm.last_recent_history_block is not None
     block = llm.last_recent_history_block
+    assert "Today's Daily Check-in:" in block
     assert "Talked about diet." in block
     assert "User is lactose intolerant." in block
     assert "hi" in block
     assert "felt tired yesterday" in block
-    # Injection order: summaries -> known facts -> transcript -> recent history
+    # Injection order: check-in -> summaries -> known facts -> transcript -> recent history
+    assert block.index("Today's Daily Check-in:") < block.index("Talked about diet.")
     assert block.index("Talked about diet.") < block.index("User is lactose intolerant.")
     assert block.index("User is lactose intolerant.") < block.index("user: hi")
     assert block.index("user: hi") < block.index("felt tired yesterday")

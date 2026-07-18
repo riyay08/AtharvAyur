@@ -35,6 +35,7 @@ class ObservedContext:
     conversation_history_block: str = ""
     session_summaries: tuple[SessionSummary, ...] = ()
     known_user_facts_block: str = ""
+    daily_checkin_block: str = ""
     environment_block: str | None = None
     embedding: list[float] | None = None
     """The embedding computed for `user_message` during Observe. Exposed so a

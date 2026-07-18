@@ -318,6 +318,7 @@ def make_chat_use_case(
 def make_chat_orchestrator(
     profiles: SqlAlchemyHealthProfileRepository = Depends(get_profile_repo),
     chat_repo: SqlAlchemyChatRepository = Depends(get_chat_repo),
+    check_ins: SqlAlchemyCheckInRepository = Depends(get_checkin_repo),
     conversations: SqlAlchemyConversationRepository = Depends(get_conversation_repo),
     summaries: SqlAlchemySessionSummaryRepository = Depends(get_session_summary_repo),
     user_memories: SqlAlchemyUserMemoryRepository = Depends(get_user_memory_repo),
@@ -326,6 +327,7 @@ def make_chat_orchestrator(
     return ChatOrchestrator(
         profiles=profiles,
         chat_repo=chat_repo,
+        check_ins=check_ins,
         conversations=conversations,
         summaries=summaries,
         user_memories=user_memories,

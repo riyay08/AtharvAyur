@@ -19,11 +19,13 @@ from __future__ import annotations
 
 import uuid
 from dataclasses import dataclass
+from datetime import date
 
 from app.application.ports.llm_gateway import GroundedReply, LLMGateway
 from app.application.ports.orchestrator import ObservedContext
 from app.application.ports.repositories import (
     ChatRepository,
+    CheckInRepository,
     ConversationRepository,
     HealthProfileRepository,
     SessionSummaryRepository,
@@ -32,6 +34,7 @@ from app.application.ports.repositories import (
 from app.domain.errors import NotFoundError
 from app.domain.services.context_blocks import (
     build_conversation_transcript,
+    build_daily_checkin_block,
     build_history_block,
     build_known_user_facts_block,
     build_profile_blob_json,
@@ -48,12 +51,15 @@ def _combine_context_blocks(context: ObservedContext) -> str:
     user payload without touching `LLMGateway` at all.
 
     Injection order (LLM reads top-to-bottom):
-      1. Session summaries (compressed cross-session recaps)
-      2. Known user facts (semantically retrieved LTM)
-      3. This conversation's transcript (if resuming)
-      4. Recent 7-day user messages (chronological)
+      1. Today's daily check-in (logged wellness state)
+      2. Session summaries (compressed cross-session recaps)
+      3. Known user facts (semantically retrieved LTM)
+      4. This conversation's transcript (if resuming)
+      5. Recent 7-day user messages (chronological)
     """
     sections: list[str] = []
+    if context.daily_checkin_block:
+        sections.append(context.daily_checkin_block)
     if context.session_summaries:
         summary_lines = "\n".join(f"- {s.summary_text}" for s in context.session_summaries)
         sections.append(f"Summaries of recent past sessions:\n{summary_lines}")
@@ -71,6 +77,7 @@ class ChatOrchestrator:
 
     profiles: HealthProfileRepository
     chat_repo: ChatRepository
+    check_ins: CheckInRepository
     conversations: ConversationRepository
     summaries: SessionSummaryRepository
     user_memories: UserMemoryRepository
@@ -86,6 +93,10 @@ class ChatOrchestrator:
         # Legacy sync repositories — untouched by the async migration, called
         # directly (no `await`) from inside this async method.
         profile = self.profiles.get_by_user_id(user_id)
+        today = date.today()
+        todays_checkins = self.check_ins.list_week(user_id, today, today)
+        latest_checkin = todays_checkins[-1] if todays_checkins else None
+        daily_checkin_block = build_daily_checkin_block(latest_checkin)
         embedding = self.llm.embed(user_message)
         recent = self.chat_repo.list_recent_user_messages(user_id, days=7, limit=80)
         semantic = (
@@ -121,6 +132,7 @@ class ChatOrchestrator:
             conversation_history_block=conversation_history_block,
             session_summaries=session_summaries,
             known_user_facts_block=known_user_facts_block,
+            daily_checkin_block=daily_checkin_block,
             embedding=embedding or None,
         )
 

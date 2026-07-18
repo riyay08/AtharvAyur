@@ -4,7 +4,8 @@ import json
 import uuid
 
 from app.domain.entities import HealthProfile
-from app.domain.services.context_blocks import build_profile_blob_json
+from app.domain.entities import DailyCheckIn, Digestion, EnergyState, MovementLevel, SleepQuality
+from app.domain.services.context_blocks import build_daily_checkin_block, build_profile_blob_json
 
 
 def _profile(**overrides) -> HealthProfile:
@@ -134,3 +135,32 @@ def test_non_serializable_conditions_falls_back_to_string_but_keeps_dosha_summar
 
     assert "weird" in parsed["conditions"]
     assert parsed["dosha_summary"]["vata_score"] == 33
+
+
+def test_build_daily_checkin_block_returns_empty_string_for_none() -> None:
+    assert build_daily_checkin_block(None) == ""
+
+
+def test_build_daily_checkin_block_formats_all_biomarkers() -> None:
+    from datetime import date
+
+    check_in = DailyCheckIn(
+        id=uuid.uuid4(),
+        user_id=uuid.uuid4(),
+        check_in_date=date(2026, 7, 17),
+        sleep_quality=SleepQuality.REFRESHED,
+        digestion=Digestion.CALM,
+        energy_state=EnergyState.GROUNDED,
+        movement=MovementLevel.LIGHT,
+        water_glasses=5,
+    )
+
+    block = build_daily_checkin_block(check_in)
+
+    assert block.startswith("Today's Daily Check-in:")
+    assert "2026-07-17" in block
+    assert "refreshed" in block
+    assert "grounded" in block
+    assert "calm" in block
+    assert "light" in block
+    assert "5 glasses of water" in block

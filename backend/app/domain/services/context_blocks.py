@@ -9,7 +9,10 @@ from __future__ import annotations
 
 import json
 from collections.abc import Sequence
-from typing import Any
+from typing import TYPE_CHECKING, Any
+
+if TYPE_CHECKING:
+    from app.domain.entities import DailyCheckIn
 
 
 def _conditions_without_quiz(conditions: Any) -> Any:
@@ -91,6 +94,24 @@ def build_conversation_transcript(messages: Any) -> str:
         return ""
     chrono = sorted(messages, key=lambda m: m.timestamp or 0)
     return "\n".join(f"{m.role.value}: {m.message}" for m in chrono)
+
+
+def build_daily_checkin_block(check_in: DailyCheckIn | None) -> str:
+    """Format the user's Daily Ritual (DailyCheckIn) for the LLM prompt.
+
+    Returns an empty string when there is no check-in for the requested day —
+    callers should omit the section entirely rather than sending a placeholder."""
+    if check_in is None:
+        return ""
+    return (
+        "Today's Daily Check-in:\n"
+        f"- Date: {check_in.check_in_date}\n"
+        f"- Sleep quality: {check_in.sleep_quality.value}\n"
+        f"- Energy state: {check_in.energy_state.value}\n"
+        f"- Digestion: {check_in.digestion.value}\n"
+        f"- Movement: {check_in.movement.value}\n"
+        f"- Hydration: {check_in.water_glasses} glasses of water"
+    )
 
 
 def build_known_user_facts_block(facts: Sequence[Any]) -> str:

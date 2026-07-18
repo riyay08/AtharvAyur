@@ -23,6 +23,7 @@ from tests.fakes import (
     FakeAsyncUnitOfWork,
     FakeAuditLogRepository,
     FakeChatRepository,
+    FakeCheckInRepository,
     FakeConversationRepository,
     FakeHealthProfileRepository,
     FakeLLMGateway,
@@ -47,6 +48,7 @@ def _make_uc(**kwargs) -> tuple[GenerateHealthReplyViaOrchestrator, dict]:
         ChatOrchestrator(
             profiles=profiles,
             chat_repo=chat_repo,
+            check_ins=kwargs.pop("check_ins", FakeCheckInRepository()),
             conversations=conversations,
             summaries=kwargs.pop("summaries", FakeSessionSummaryRepository()),
             user_memories=kwargs.pop("user_memories", FakeUserMemoryRepository()),
