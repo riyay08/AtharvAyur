@@ -12,6 +12,7 @@ from typing import Any
 
 from app.application.ports.google_token_verifier import GoogleIdClaims
 from app.application.ports.llm_gateway import GroundedReply
+from app.application.ports.orchestrator import ObservedContext
 from app.application.ports.webauthn_service import (
     AuthenticationChallenge,
     RegistrationChallenge,
@@ -255,6 +256,12 @@ class FakeLLMGateway:
         daily_tip_json: str = '{"tip_title": "Hydrate Mindfully", "tip_description": "Sip warm water.", "icon_name": "droplet"}',
         citations: tuple[Citation, ...] = (),
         search_queries: tuple[str, ...] = (),
+        session_summary: str = (
+            "The user mentioned feeling sluggish and having trouble sleeping. "
+            "We discussed warm water in the mornings and an earlier wind-down routine. "
+            "Energy improved slightly by the end of the conversation; worth checking sleep quality again next time."
+        ),
+        long_term_facts: tuple[str, ...] = (),
     ) -> None:
         self._embedding = embedding if embedding is not None else [0.1] * 8
         self._reply_text = reply_text
@@ -263,7 +270,12 @@ class FakeLLMGateway:
         self._daily_tip_json = daily_tip_json
         self._citations = citations
         self._search_queries = search_queries
+        self._session_summary = session_summary
+        self._long_term_facts = long_term_facts
         self.calls: list[str] = []
+        self.last_recent_history_block: str | None = None
+        self.last_transcript: str | None = None
+        self.last_facts_transcript: str | None = None
 
     def embed(self, text: str) -> list[float]:
         self.calls.append(f"embed:{text[:20]}")
@@ -279,6 +291,7 @@ class FakeLLMGateway:
         environment_block: str | None,
     ) -> GroundedReply:
         self.calls.append("generate_health_reply")
+        self.last_recent_history_block = recent_history_block
         return GroundedReply(
             reply_text=self._reply_text,
             citations=self._citations,

@@ -21,6 +21,7 @@ from app.interfaces.http.routers import (
     plan as plan_router,
     profile as profile_router,
 )
+from app.interfaces.http.routers.v1 import conversations as conversations_router
 from app.scheduler import shutdown_scheduler, start_scheduler
 
 logger = logging.getLogger(__name__)
@@ -78,6 +79,7 @@ def create_app() -> FastAPI:
     app.include_router(checkin_router.router)
     app.include_router(environment_router.router)
     app.include_router(plan_router.router)
+    app.include_router(conversations_router.router)
 
     @app.get("/health")
     def _health() -> dict[str, str]:

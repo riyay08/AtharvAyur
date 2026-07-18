@@ -68,3 +68,23 @@ class LLMGateway(Protocol):
     ) -> str:
         """Return raw text containing {tip_title, tip_description, icon_name}."""
         ...
+
+    def generate_session_summary(self, *, transcript: str) -> str:
+        """Return a ~3-sentence recap of `transcript`, plain text (not JSON).
+
+        Used by the Janitor background worker when a conversation ends. Focused
+        on symptoms/concerns raised and actionable health insights discussed —
+        never a diagnosis.
+        """
+        ...
+
+    def extract_long_term_facts(self, *, transcript: str) -> tuple[str, ...]:
+        """Return 0+ concise, declarative Long-Term Memory facts worth
+        remembering beyond this session (e.g. "User is lactose intolerant",
+        "User prefers mornings for exercise").
+
+        Also called by the Janitor, as a second pass after `generate_session_summary`.
+        Most conversations yield zero facts — this is expected, not an error.
+        Never returns a diagnosis or a restatement of the session summary itself.
+        """
+        ...

@@ -12,6 +12,7 @@ from collections.abc import Generator
 
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import OAuth2PasswordBearer
+from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
 from app.application.ports.clock import Clock
@@ -38,6 +39,7 @@ from app.application.use_cases.auth import (
 )
 from app.application.use_cases.chat import GenerateHealthReply
 from app.application.use_cases.checkin import GetCheckInWeek, UpsertCheckIn
+from app.application.use_cases.conversations import EndConversation
 from app.application.use_cases.environment import GetOrCreateDailyEnvironmentTip
 from app.application.use_cases.plan import (
     GenerateWeeklyPlan,
@@ -47,16 +49,20 @@ from app.application.use_cases.plan import (
 )
 from app.application.use_cases.profile import GetProfileMe, UpsertProfile
 from app.config import settings
-from app.database import get_session_factory
+from app.database import get_async_db, get_session_factory
 from app.domain.errors import ConfigurationError, ValidationError
 from app.infrastructure.auth.bcrypt_password_hasher import BcryptPasswordHasher
 from app.infrastructure.auth.google_token_verifier import GoogleIdTokenVerifier
 from app.infrastructure.auth.jose_token_service import JoseTokenService
 from app.infrastructure.auth.otp_code_generator import SecureOtpCodeGenerator
 from app.infrastructure.auth.py_webauthn_service import PyWebAuthnService
+from app.infrastructure.db.async_unit_of_work import SqlAlchemyAsyncUnitOfWork
 from app.infrastructure.db.repositories.audit_log_repository import SqlAlchemyAuditLogRepository
 from app.infrastructure.db.repositories.chat_repository import SqlAlchemyChatRepository
 from app.infrastructure.db.repositories.checkin_repository import SqlAlchemyCheckInRepository
+from app.infrastructure.db.repositories.conversation_repository import (
+    SqlAlchemyConversationRepository,
+)
 from app.infrastructure.db.repositories.environment_tip_repository import (
     SqlAlchemyEnvironmentTipRepository,
 )
@@ -65,6 +71,12 @@ from app.infrastructure.db.repositories.health_profile_repository import (
 )
 from app.infrastructure.db.repositories.phone_otp_repository import (
     SqlAlchemyPhoneOtpRepository,
+)
+from app.infrastructure.db.repositories.session_summary_repository import (
+    SqlAlchemySessionSummaryRepository,
+)
+from app.infrastructure.db.repositories.user_memory_repository import (
+    SqlAlchemyUserMemoryRepository,
 )
 from app.infrastructure.db.repositories.user_repository import SqlAlchemyUserRepository
 from app.infrastructure.db.repositories.webauthn_credential_repository import (
@@ -207,6 +219,31 @@ def get_webauthn_repo(
     db: Session = Depends(get_db),
 ) -> SqlAlchemyWebAuthnCredentialRepository:
     return SqlAlchemyWebAuthnCredentialRepository(db)
+
+
+# ---------- Async repositories (v2.0 modules only) ----------
+
+
+def get_conversation_repo(
+    db: AsyncSession = Depends(get_async_db),
+) -> SqlAlchemyConversationRepository:
+    return SqlAlchemyConversationRepository(db)
+
+
+def get_session_summary_repo(
+    db: AsyncSession = Depends(get_async_db),
+) -> SqlAlchemySessionSummaryRepository:
+    return SqlAlchemySessionSummaryRepository(db)
+
+
+def get_user_memory_repo(
+    db: AsyncSession = Depends(get_async_db),
+) -> SqlAlchemyUserMemoryRepository:
+    return SqlAlchemyUserMemoryRepository(db)
+
+
+def get_async_uow(db: AsyncSession = Depends(get_async_db)) -> SqlAlchemyAsyncUnitOfWork:
+    return SqlAlchemyAsyncUnitOfWork(db)
 
 
 # ---------- Use cases ----------
@@ -494,3 +531,13 @@ def make_get_authenticated_user(
     credentials: SqlAlchemyWebAuthnCredentialRepository = Depends(get_webauthn_repo),
 ) -> GetAuthenticatedUser:
     return GetAuthenticatedUser(users=users, credentials=credentials)
+
+
+# ---------- Conversations (v2.0) ----------
+
+
+def make_end_conversation(
+    conversations: SqlAlchemyConversationRepository = Depends(get_conversation_repo),
+    uow: SqlAlchemyAsyncUnitOfWork = Depends(get_async_uow),
+) -> EndConversation:
+    return EndConversation(conversations=conversations, uow=uow)

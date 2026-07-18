@@ -68,6 +68,27 @@ _TIP_SYSTEM = (
     "Droplet, Moon). Non-diagnostic; no supplements or dosages."
 )
 
+_SESSION_SUMMARY_SYSTEM = (
+    "Summarize the following health/wellness conversation in EXACTLY 3 sentences of plain text "
+    "(no JSON, no markdown, no bullet points, no preamble). Sentence 1: symptoms or health concerns "
+    "the user raised. Sentence 2: actionable lifestyle/wellness insight or suggestion that was "
+    "discussed. Sentence 3: how the user's state evolved over the conversation, or what to follow up "
+    "on next time. Never state a diagnosis. Never invent details not present in the transcript."
+)
+
+_LONG_TERM_FACTS_SYSTEM = (
+    "You extract Long-Term Memory facts from a health/wellness conversation transcript. A fact is a "
+    "durable, declarative statement about the user that would remain true and useful in future, "
+    "unrelated conversations — e.g. a dietary restriction, allergy, chronic condition, firm "
+    "preference, or habit ('User is lactose intolerant', 'User prefers mornings for exercise'). "
+    "Do NOT extract: symptoms specific to this conversation, moods, one-off events, or anything "
+    "already obviously a diagnosis. Most conversations contain ZERO such facts — only extract what "
+    "is explicitly stated or directly implied by the user, never invented. Each fact must be a short, "
+    "self-contained sentence (under 150 characters) written in third person about 'User'. "
+    'Return ONE JSON object with exactly this schema: {"facts": ["...", ...]}. If there are no '
+    'durable facts, return {"facts": []}.'
+)
+
 
 def _safe_json(text: str) -> dict[str, Any]:
     """Best-effort decode of a model response into a dict.
@@ -84,6 +105,20 @@ def _safe_json(text: str) -> dict[str, Any]:
     except Exception:
         pass
     return {"response_text": s, "citations": []}
+
+
+def _parse_facts_json(text: str) -> tuple[str, ...]:
+    """Best-effort decode of `{"facts": [...]}` from a JSON-object-mode response."""
+    try:
+        obj = json.loads((text or "").strip())
+    except Exception:
+        return ()
+    if not isinstance(obj, dict):
+        return ()
+    facts = obj.get("facts")
+    if not isinstance(facts, list):
+        return ()
+    return tuple(f.strip() for f in facts if isinstance(f, str) and f.strip())
 
 
 class GroqLLMGateway:
@@ -213,7 +248,38 @@ class GroqLLMGateway:
         )
         return self._chat_json(system=_TIP_SYSTEM, user_text=user_content)
 
+    def generate_session_summary(self, *, transcript: str) -> str:
+        user_content = f"Conversation transcript:\n{transcript}"
+        return self._chat_text(system=_SESSION_SUMMARY_SYSTEM, user_text=user_content)
+
+    def extract_long_term_facts(self, *, transcript: str) -> tuple[str, ...]:
+        user_content = f"Conversation transcript:\n{transcript}"
+        raw = self._chat_json(system=_LONG_TERM_FACTS_SYSTEM, user_text=user_content)
+        return _parse_facts_json(raw)
+
     # ------------------------------------------------------------------ helpers
+
+    def _chat_text(self, *, system: str, user_text: str) -> str:
+        """Like `_chat_json` but without forcing JSON-object response mode — for
+        plain-prose outputs (e.g. the session summary), not JSON payloads."""
+        try:
+            completion = self._client.chat.completions.create(
+                model=self._model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user_text},
+                ],
+                temperature=0.3,
+            )
+        except APIError as exc:
+            logger.warning("Groq call failed: %s", exc)
+            raise ExternalServiceError(f"LLM call failed: {exc}") from exc
+
+        try:
+            choice = completion.choices[0]
+            return (choice.message.content or "").strip()
+        except (AttributeError, IndexError):
+            return ""
 
     def _chat_json(self, *, system: str, user_text: str) -> str:
         """Call Groq's chat-completions in JSON-object mode and return the raw string."""
