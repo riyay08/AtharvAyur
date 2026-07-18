@@ -33,3 +33,5 @@ dist/
 *.tfstate.*
 .terraform.lock.hcl
 infra/terraform/terraform.tfvars
+infra/tfplan
+infra/terraform.tfvars
