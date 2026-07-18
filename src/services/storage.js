@@ -7,6 +7,7 @@ export const USER_STORAGE_KEY = "holistica_user_id";
 export const ACCESS_TOKEN_KEY = "holistica_access_token";
 export const ONBOARDING_STORAGE_KEY = "holistica_has_completed_onboarding";
 export const AUTH_USER_KEY = "holistica_auth_user";
+export const CONVERSATION_ID_KEY_PREFIX = "holistica_conversation_id";
 
 function safeGet(key) {
   try {
@@ -85,8 +86,31 @@ export function clearStoredAuthUser() {
   safeRemove(AUTH_USER_KEY);
 }
 
+function conversationStorageKey(userId) {
+  const uid = userId != null ? String(userId) : safeGet(USER_STORAGE_KEY);
+  return uid ? `${CONVERSATION_ID_KEY_PREFIX}:${uid}` : null;
+}
+
+/** Active v2 chat session id (scoped per user). */
+export function getStoredConversationId(userId) {
+  const key = conversationStorageKey(userId);
+  return key ? safeGet(key) : null;
+}
+
+export function setStoredConversationId(userId, conversationId) {
+  const key = conversationStorageKey(userId);
+  if (key && conversationId != null) safeSet(key, String(conversationId));
+}
+
+export function clearStoredConversationId(userId) {
+  const key = conversationStorageKey(userId);
+  if (key) safeRemove(key);
+}
+
 /** Clears saved user id, JWT, and onboarding flag (e.g. to show the quiz again). */
 export function clearHolisticaSession() {
+  const uid = safeGet(USER_STORAGE_KEY);
+  if (uid) clearStoredConversationId(uid);
   clearStoredUserId();
   clearStoredAccessToken();
   clearOnboardingCompleted();

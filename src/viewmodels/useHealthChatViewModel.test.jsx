@@ -6,6 +6,7 @@ import { useHealthChatViewModel } from "./useHealthChatViewModel.js";
 describe("useHealthChatViewModel", () => {
   it("appends user + assistant messages and attaches citations", async () => {
     const sendChatMessage = vi.fn().mockResolvedValue({
+      conversation_id: "conv-1",
       response_text: "Drink warm water.",
       citations: [{ url: "https://example.com", source_name: "Example" }],
       web_search_queries: ["hydration"],
@@ -84,5 +85,18 @@ describe("useHealthChatViewModel", () => {
       await result.current.send();
     });
     expect(sendChatMessage).not.toHaveBeenCalled();
+  });
+
+  it("schedules endSession when the chat panel unmounts", async () => {
+    const endSession = vi.fn().mockResolvedValue({ summary_pending: true });
+    const { unmount } = renderHook(() =>
+      useHealthChatViewModel({ userId: "u-1", sendChatMessage: vi.fn(), endSession })
+    );
+
+    unmount();
+
+    await waitFor(() => {
+      expect(endSession).toHaveBeenCalledTimes(1);
+    });
   });
 });

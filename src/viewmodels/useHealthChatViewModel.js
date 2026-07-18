@@ -1,6 +1,9 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
-import { sendChatMessage as sendChatMessageApi } from "../services/chatService.js";
+import {
+  endSession as endSessionApi,
+  sendChatMessage as sendChatMessageApi,
+} from "../services/chatService.js";
 
 /**
  * ViewModel for the chat panel.
@@ -10,6 +13,7 @@ import { sendChatMessage as sendChatMessageApi } from "../services/chatService.j
  *   latitude?: number | null,
  *   longitude?: number | null,
  *   sendChatMessage?: typeof sendChatMessageApi,
+ *   endSession?: typeof endSessionApi,
  * }} params
  */
 export function useHealthChatViewModel({
@@ -17,11 +21,20 @@ export function useHealthChatViewModel({
   latitude,
   longitude,
   sendChatMessage = sendChatMessageApi,
+  endSession = endSessionApi,
 }) {
   const [messages, setMessages] = useState(/** @type {any[]} */ ([]));
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(/** @type {string | null} */ (null));
+
+  useEffect(() => {
+    return () => {
+      void endSession().catch(() => {
+        /* Janitor scheduling is best-effort when leaving the chat panel */
+      });
+    };
+  }, [endSession]);
 
   const send = useCallback(async () => {
     const text = input.trim();
@@ -31,11 +44,11 @@ export function useHealthChatViewModel({
     setMessages((m) => [...m, { role: "user", text }]);
     setLoading(true);
     try {
-      const coords =
+      const options =
         typeof latitude === "number" && typeof longitude === "number"
           ? { latitude, longitude }
           : undefined;
-      const data = await sendChatMessage(text, coords);
+      const data = await sendChatMessage(text, options);
       const assistantMsg = data.blocked
         ? {
             role: "assistant",
