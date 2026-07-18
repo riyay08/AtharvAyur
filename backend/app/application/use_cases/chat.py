@@ -18,36 +18,9 @@ from app.application.ports.unit_of_work import UnitOfWork
 from app.application.ports.weather_gateway import WeatherGateway
 from app.domain.entities import ChatMessage
 from app.domain.errors import ExternalServiceError
+from app.domain.services.context_blocks import build_history_block, build_profile_blob_json
 from app.domain.services.safety_policy import SafetyResult, evaluate_message
 from app.domain.value_objects import ChatRole, SafetyBlockReason
-
-
-def _profile_blob(profile) -> str:
-    if profile is None:
-        return "{}"
-    payload = {
-        "conditions": profile.conditions,
-        "allergies": profile.allergies,
-        "medications": profile.medications,
-    }
-    try:
-        return json.dumps(payload, indent=2, default=str)
-    except TypeError:
-        return json.dumps(
-            {
-                "conditions": str(profile.conditions),
-                "allergies": str(profile.allergies),
-                "medications": str(profile.medications),
-            },
-            indent=2,
-        )
-
-
-def _history_block(messages) -> str:
-    if not messages:
-        return "No user messages in the last 7 days."
-    chrono = sorted(messages, key=lambda m: m.timestamp or 0)
-    return "\n".join(f"- {m.message}" for m in chrono)
 
 
 @dataclass(frozen=True, slots=True)
@@ -112,9 +85,9 @@ class GenerateHealthReply:
 
         reply = self.llm.generate_health_reply(
             user_message=cmd.message,
-            profile_blob_json=_profile_blob(profile),
-            recent_history_block=_history_block(recent),
-            semantic_history_block=_history_block(semantic),
+            profile_blob_json=build_profile_blob_json(profile),
+            recent_history_block=build_history_block(recent),
+            semantic_history_block=build_history_block(semantic),
             environment_block=environment_block,
         )
 

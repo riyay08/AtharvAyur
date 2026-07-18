@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     gemini_api_key: str | None = None
     # Model must support Grounding with Google Search — see https://ai.google.dev/gemini-api/docs/google-search
-    gemini_model: str = "gemini-2.5-flash"
+    gemini_model: str = "gemini-flash-latest"
     gemini_embedding_model: str = "gemini-embedding-001"
 
     # Groq — https://console.groq.com/docs/models
