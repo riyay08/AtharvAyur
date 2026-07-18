@@ -262,6 +262,9 @@ class GenerateHealthReplyInput:
     message: str
     lat: float | None = None
     lon: float | None = None
+    conversation_id: uuid.UUID | None = None
+    """If set, resume this conversation (must belong to `user_id`). If omitted,
+    a new `Conversation` is created and its id is returned on the output."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -271,6 +274,7 @@ class GenerateHealthReplyOutput:
     block_reason: str
     citations: tuple[Citation, ...] = ()
     search_queries: tuple[str, ...] = ()
+    conversation_id: uuid.UUID | None = None
 
 
 # ---------- Environment ----------

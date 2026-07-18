@@ -15,9 +15,11 @@ from fastapi.security import OAuth2PasswordBearer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import Session
 
+from app.application.orchestrator.orchestrator import ChatOrchestrator
 from app.application.ports.clock import Clock
 from app.application.ports.google_token_verifier import GoogleTokenVerifier
 from app.application.ports.llm_gateway import LLMGateway
+from app.application.ports.orchestrator import Orchestrator
 from app.application.ports.otp_code_generator import OtpCodeGenerator
 from app.application.ports.password_hasher import PasswordHasher
 from app.application.ports.sms_sender import SmsSender
@@ -38,6 +40,7 @@ from app.application.use_cases.auth import (
     VerifyPhoneOtp,
 )
 from app.application.use_cases.chat import GenerateHealthReply
+from app.application.use_cases.chat_orchestrated import GenerateHealthReplyViaOrchestrator
 from app.application.use_cases.checkin import GetCheckInWeek, UpsertCheckIn
 from app.application.use_cases.conversations import EndConversation
 from app.application.use_cases.environment import GetOrCreateDailyEnvironmentTip
@@ -309,6 +312,46 @@ def make_chat_use_case(
         llm=llm,
         weather=weather,
         uow=uow,
+    )
+
+
+def make_chat_orchestrator(
+    profiles: SqlAlchemyHealthProfileRepository = Depends(get_profile_repo),
+    chat_repo: SqlAlchemyChatRepository = Depends(get_chat_repo),
+    conversations: SqlAlchemyConversationRepository = Depends(get_conversation_repo),
+    summaries: SqlAlchemySessionSummaryRepository = Depends(get_session_summary_repo),
+    user_memories: SqlAlchemyUserMemoryRepository = Depends(get_user_memory_repo),
+    llm: LLMGateway = Depends(get_llm_gateway),
+) -> Orchestrator:
+    return ChatOrchestrator(
+        profiles=profiles,
+        chat_repo=chat_repo,
+        conversations=conversations,
+        summaries=summaries,
+        user_memories=user_memories,
+        llm=llm,
+    )
+
+
+def make_chat_orchestrated_use_case(
+    chat_repo: SqlAlchemyChatRepository = Depends(get_chat_repo),
+    profiles: SqlAlchemyHealthProfileRepository = Depends(get_profile_repo),
+    conversations: SqlAlchemyConversationRepository = Depends(get_conversation_repo),
+    audit: SqlAlchemyAuditLogRepository = Depends(get_audit_repo),
+    orchestrator: Orchestrator = Depends(make_chat_orchestrator),
+    weather: WeatherGateway = Depends(get_weather_gateway),
+    uow: SqlAlchemyUnitOfWork = Depends(get_uow),
+    async_uow: SqlAlchemyAsyncUnitOfWork = Depends(get_async_uow),
+) -> GenerateHealthReplyViaOrchestrator:
+    return GenerateHealthReplyViaOrchestrator(
+        chat_repo=chat_repo,
+        profiles=profiles,
+        conversations=conversations,
+        audit=audit,
+        orchestrator=orchestrator,
+        weather=weather,
+        uow=uow,
+        async_uow=async_uow,
     )
 
 
